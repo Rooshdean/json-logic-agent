@@ -1,4 +1,4 @@
-# JSON Logic Agent V5 Command Reference
+# JSON Logic Agent V5.2 Command Reference
 
 ## Interactive project browser
 
@@ -8,84 +8,68 @@ jsonlogic scan .
 
 n8n exports are automatically labeled `[n8n-workflow]`.
 
-Non-interactive:
-
-```bash
-jsonlogic scan . --no-interactive
-jsonlogic scan . --json
-```
-
 ## Generic JSON
 
 ```bash
 jsonlogic explain file.json
-jsonlogic explain file.json --to logic
 jsonlogic explain file.json --to python
 jsonlogic explain file.json --to javascript
 jsonlogic explain file.json --to typescript
 jsonlogic explain file.json --to mermaid
 ```
 
-If the file is an n8n workflow, detection is automatic.
-
-Print its n8n report before semantic output:
-
-```bash
-jsonlogic explain workflow.json --n8n-report
-```
-
-## n8n deep-dive command
-
-Default normal-logic deep dive:
+## n8n deep dive
 
 ```bash
 jsonlogic n8n workflow.json
-```
-
-JavaScript:
-
-```bash
 jsonlogic n8n workflow.json --to javascript
-```
-
-Python:
-
-```bash
 jsonlogic n8n workflow.json --to python
-```
-
-TypeScript:
-
-```bash
 jsonlogic n8n workflow.json --to typescript
-```
-
-Mermaid:
-
-```bash
 jsonlogic n8n workflow.json --to mermaid
 ```
 
-## n8n local report — no model/API call
-
-Human-readable:
+## Local n8n report
 
 ```bash
 jsonlogic n8n workflow.json --report-only
-```
-
-Machine-readable:
-
-```bash
 jsonlogic n8n workflow.json --report-only --report-json
 ```
 
-## Save output
+## Export complete analysis
+
+Markdown:
+
+```bash
+jsonlogic n8n workflow.json --export workflow-report.md
+jsonlogic explain file.json --export analysis.md
+```
+
+PDF:
+
+```bash
+jsonlogic n8n workflow.json --export workflow-report.pdf
+jsonlogic explain file.json --export analysis.pdf
+```
+
+Combine an output view with a report:
+
+```bash
+jsonlogic n8n workflow.json --to mermaid --export workflow-diagram.pdf
+jsonlogic n8n workflow.json --to javascript --export workflow-code-review.md
+```
+
+The export includes the full report: metadata, n8n intelligence when applicable, semantic deep dive, target output, fidelity score, warnings, and pipeline metadata.
+
+## Save only target output
+
+`--out` intentionally differs from `--export`:
 
 ```bash
 jsonlogic n8n workflow.json --to javascript --out workflow.js
-jsonlogic explain file.json --to python --out generated.py
+jsonlogic n8n workflow.json --to mermaid --out workflow.mmd
 ```
+
+Use `--out` for only the generated code/diagram source. Use `--export` for a complete `.md` or `.pdf` analysis report. Both flags can be used together.
 
 ## Semantic debugging
 
@@ -99,17 +83,6 @@ jsonlogic explain file.json --trace-out trace.json
 ## Model override
 
 ```bash
-jsonlogic n8n workflow.json --model <model-name>
-jsonlogic explain file.json --model <model-name>
-jsonlogic scan . --model <model-name>
+jsonlogic n8n workflow.json --model <openrouter-model-id>
+jsonlogic explain file.json --model <openrouter-model-id>
 ```
-
-## Legacy syntax
-
-Still supported:
-
-```bash
-jsonlogic file.json --to python
-```
-
-Recommended V5 entry points are `jsonlogic scan .`, `jsonlogic explain ...`, and `jsonlogic n8n ...`.
