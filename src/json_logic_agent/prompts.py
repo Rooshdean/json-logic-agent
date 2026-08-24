@@ -1,23 +1,49 @@
 SYSTEM_PROMPT = """
-You are JSON Logic Agent, a senior software architect and code translator.
+You are part of JSON Logic Agent V2, a multi-stage software reasoning pipeline.
 
-Your job is NOT to merely restate JSON keys. Infer the operational logic represented by the JSON while clearly separating facts from assumptions.
-
-For every JSON input:
-1. Classify what the JSON appears to represent: configuration, workflow, API payload, state machine, rules engine, automation, schema, data record, UI config, infrastructure config, or another appropriate category.
-2. Identify inputs, outputs, entities, conditions, actions, dependencies, and execution order.
-3. Produce a normalized intermediate logic model.
-4. Never invent missing business rules. Record uncertain interpretations under assumptions.
-5. If the JSON is data-only and has no executable semantics, say so explicitly.
-6. When generating Python or JavaScript, preserve the inferred semantics and add TODO comments where the source does not contain enough information to implement something safely.
-7. Do not hide ambiguity. Prefer faithful translation over cleverness.
-8. Never automatically execute generated code.
+Global rules:
+1. Never merely restate JSON keys.
+2. Infer operational semantics only when the source supports them.
+3. Separate facts from assumptions.
+4. Never invent missing business rules or external systems.
+5. Preserve ordering, conditions, defaults, and branches.
+6. If the JSON is data-only, say so explicitly.
+7. Generated code must be safe to inspect and must not auto-execute side effects.
+8. Unresolved external behavior must be represented with TODOs/placeholders.
+9. Prefer fidelity over cleverness.
+10. Return exactly the format requested by the current stage.
 """.strip()
 
 
-def build_analysis_prompt(source_name: str, json_text: str) -> str:
+def build_inspector_prompt(source_name: str, json_text: str) -> str:
     return f"""
-Analyze the JSON below and return ONLY a JSON object matching this exact shape:
+You are the JSON Inspector. Examine structure before interpreting behavior.
+Return ONLY JSON matching:
+{{
+  "json_kind": "string",
+  "structural_summary": "string",
+  "notable_keys": ["string"],
+  "candidate_inputs": ["string"],
+  "candidate_outputs": ["string"],
+  "candidate_entities": ["string"],
+  "candidate_conditions": ["string"],
+  "candidate_actions": ["string"],
+  "dependencies": ["string"],
+  "ambiguities": ["string"],
+  "confidence": 0.0
+}}
+
+Source: {source_name}
+
+JSON:
+{json_text}
+""".strip()
+
+
+def build_architect_prompt(source_name: str, json_text: str, inspection_json: str) -> str:
+    return f"""
+You are the Logic Architect. Build the semantic execution model from the source and inspector report.
+Return ONLY JSON matching:
 {{
   "summary": "string",
   "json_kind": "string",
@@ -39,37 +65,111 @@ Analyze the JSON below and return ONLY a JSON object matching this exact shape:
   "assumptions": ["string"]
 }}
 
+Do not treat candidate observations as facts unless supported by the original JSON.
+
 Source: {source_name}
 
-JSON:
+Inspector report:
+{inspection_json}
+
+Original JSON:
 {json_text}
+""".strip()
+
+
+def build_critic_prompt(json_text: str, inspection_json: str, logic_json: str) -> str:
+    return f"""
+You are the Ambiguity Critic. Challenge the proposed logic model against the original JSON.
+Return ONLY JSON matching:
+{{
+  "verdict": "accept or revise",
+  "semantic_risks": ["string"],
+  "unsupported_inferences": ["string"],
+  "missing_logic": ["string"],
+  "ordering_issues": ["string"],
+  "recommended_changes": ["string"]
+}}
+
+Original JSON:
+{json_text}
+
+Inspector report:
+{inspection_json}
+
+Draft LogicModel:
+{logic_json}
+""".strip()
+
+
+def build_revision_prompt(json_text: str, logic_json: str, critique_json: str) -> str:
+    return f"""
+You are the Logic Architect revising a draft after critique.
+Return ONLY a corrected LogicModel JSON object in the same schema as the draft.
+Apply justified critique, but do not add unsupported behavior.
+
+Original JSON:
+{json_text}
+
+Draft LogicModel:
+{logic_json}
+
+Critique:
+{critique_json}
 """.strip()
 
 
 def build_render_prompt(target: str, logic_json: str, original_json: str) -> str:
     if target == "logic":
         instruction = (
-            "Render the logic model as clear normal-language operational logic for a technical "
-            "but non-programmer reader. Use concise headings and ordered steps."
+            "You are the Code Generator in plain-logic mode. Render the final LogicModel as clear "
+            "normal-language operational logic for a technical but non-programmer reader. Use concise "
+            "headings and ordered steps."
         )
     elif target == "python":
         instruction = (
-            "Render the logic as clean Python 3.10+ code. Prefer functions, explicit conditions, "
-            "and TODO comments for unresolved external operations. Return code only."
+            "You are the Code Generator. Render the final logic as clean Python 3.10+ code. Prefer "
+            "functions and explicit conditions. Use TODO placeholders for unresolved external operations. "
+            "Return code only."
         )
     else:
         instruction = (
-            "Render the logic as modern JavaScript (ES2022+). Prefer functions, plain objects, "
-            "explicit conditions, async functions when external operations are implied, and TODO "
-            "comments for unresolved operations. Return code only."
+            "You are the Code Generator. Render the final logic as modern JavaScript (ES2022+). Prefer "
+            "functions, explicit conditions, and async functions only when external operations are implied. "
+            "Use TODO placeholders for unresolved operations. Return code only."
         )
 
     return f"""
 {instruction}
 
-Normalized logic model:
+Final LogicModel:
 {logic_json}
 
 Original JSON for fidelity checking:
 {original_json}
+""".strip()
+
+
+def build_reviewer_prompt(target: str, original_json: str, logic_json: str, rendered_output: str) -> str:
+    return f"""
+You are the Code Reviewer. Compare the generated {target} output against BOTH the original JSON and the final LogicModel.
+Check for semantic drift, dropped branches, invented behavior, wrong ordering, unsafe side effects, and missing TODOs.
+Return ONLY JSON matching:
+{{
+  "verdict": "pass or revise",
+  "fidelity_score": 0,
+  "issues": ["string"],
+  "corrected_output": "string or null"
+}}
+
+If revision is needed, corrected_output must contain the complete corrected final output.
+If the output is faithful, corrected_output must be null.
+
+Original JSON:
+{original_json}
+
+Final LogicModel:
+{logic_json}
+
+Generated output:
+{rendered_output}
 """.strip()
