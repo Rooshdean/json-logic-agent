@@ -1,5 +1,5 @@
 SYSTEM_PROMPT = """
-You are part of JSON Logic Agent V2, a multi-stage software reasoning pipeline.
+You are part of JSON Logic Agent V3, a developer-focused JSON reverse-engineering pipeline.
 
 Global rules:
 1. Never merely restate JSON keys.
@@ -11,7 +11,8 @@ Global rules:
 7. Generated code must be safe to inspect and must not auto-execute side effects.
 8. Unresolved external behavior must be represented with TODOs/placeholders.
 9. Prefer fidelity over cleverness.
-10. Return exactly the format requested by the current stage.
+10. Explain the source in terms useful to a developer who understands code but may not be comfortable reading JSON.
+11. Return exactly the format requested by the current stage.
 """.strip()
 
 
@@ -121,24 +122,36 @@ Critique:
 def build_render_prompt(target: str, logic_json: str, original_json: str) -> str:
     if target == "logic":
         instruction = (
-            "You are the Code Generator in plain-logic mode. Render the final LogicModel as clear "
-            "normal-language operational logic for a technical but non-programmer reader. Use concise "
-            "headings and ordered steps."
+            "You are the Generator in plain-logic mode. Explain what the JSON means to a developer "
+            "who understands programming but does not want to mentally parse JSON. Start with purpose, "
+            "then describe the flow in execution order, conditions/branches, inputs/outputs, dependencies, "
+            "and uncertainties. Keep it concrete and readable."
         )
     elif target == "python":
         instruction = (
-            "You are the Code Generator. Render the final logic as clean Python 3.10+ code. Prefer "
-            "functions and explicit conditions. Use TODO placeholders for unresolved external operations. "
-            "Return code only."
+            "Render the final logic as clean Python 3.10+ code. Prefer functions and explicit conditions. "
+            "Use TODO placeholders for unresolved external operations. Return code only."
+        )
+    elif target == "javascript":
+        instruction = (
+            "Render the final logic as modern JavaScript (ES2022+). Prefer functions, explicit conditions, "
+            "and async functions only when external operations are implied. Use TODO placeholders. Return code only."
+        )
+    elif target == "typescript":
+        instruction = (
+            "Render the final logic as modern TypeScript. Add useful interfaces/types inferred only from the source, "
+            "prefer explicit functions and conditions, and use TODO placeholders for unresolved operations. Return code only."
+        )
+    elif target == "mermaid":
+        instruction = (
+            "Render the final logic as a Mermaid flowchart showing execution order, decisions, branches, actions, "
+            "and outputs. Return Mermaid source only, beginning with flowchart TD. Do not wrap it in markdown fences."
         )
     else:
-        instruction = (
-            "You are the Code Generator. Render the final logic as modern JavaScript (ES2022+). Prefer "
-            "functions, explicit conditions, and async functions only when external operations are implied. "
-            "Use TODO placeholders for unresolved operations. Return code only."
-        )
+        raise ValueError(f"Unsupported target: {target}")
 
     return f"""
+You are the Code/Logic Generator.
 {instruction}
 
 Final LogicModel:
@@ -153,6 +166,7 @@ def build_reviewer_prompt(target: str, original_json: str, logic_json: str, rend
     return f"""
 You are the Code Reviewer. Compare the generated {target} output against BOTH the original JSON and the final LogicModel.
 Check for semantic drift, dropped branches, invented behavior, wrong ordering, unsafe side effects, and missing TODOs.
+For Mermaid, also check that decisions and branch direction are represented faithfully.
 Return ONLY JSON matching:
 {{
   "verdict": "pass or revise",
