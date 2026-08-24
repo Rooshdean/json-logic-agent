@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "json-logic-agent"
-version = "0.5.0"
-description = "Interactive JSON and n8n workflow reverse engineer with normal logic, Python, JavaScript, TypeScript, Mermaid, graph analysis, and semantic review."
+version = "0.5.1"
+description = "Interactive JSON and n8n workflow reverse engineer powered by OpenRouter, with local graph analysis and semantic review."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
