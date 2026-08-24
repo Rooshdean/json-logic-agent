@@ -1,8 +1,8 @@
-# JSON Logic Agent V5.1
+# JSON Logic Agent V5.2
 
 > **Understand JSON — and deep-dive n8n workflows — without having to think in JSON.**
 
-JSON Logic Agent is an interactive JSON/n8n reverse-engineering tool. V5.1 uses **OpenRouter** for standalone AI-assisted analysis, so you can choose from OpenRouter-supported model IDs instead of being tied to one model provider.
+JSON Logic Agent is an interactive JSON/n8n reverse-engineering tool. It uses local deterministic analysis for n8n structure and OpenRouter for AI-assisted semantic analysis. V5.2 adds complete **Markdown and PDF report exports**.
 
 ## Start here
 
@@ -14,15 +14,11 @@ Use arrow keys to choose a JSON file and view it as normal logic, Python, JavaSc
 
 ## Installation
 
-Python **3.10+** is required. On macOS, if the system Python is 3.9, install a newer Python first, for example with Homebrew:
+Python **3.10+** is required. On macOS:
 
 ```bash
 brew install python@3.12
-```
 
-Then:
-
-```bash
 git clone https://github.com/Rooshdean/json-logic-agent.git
 cd json-logic-agent
 python3.12 -m venv .venv
@@ -32,87 +28,83 @@ pip install -e .
 cp .env.example .env
 ```
 
+After pulling V5.2 into an existing clone, run `pip install -e .` again so the PDF dependency is installed.
+
 ## Configure OpenRouter
 
-Create an API key in OpenRouter and put it in `.env`:
+Put your OpenRouter key and preferred model in `.env`:
 
 ```text
 OPENROUTER_API_KEY=your-openrouter-key
 JSON_LOGIC_MODEL=anthropic/claude-sonnet-4
 ```
 
-`JSON_LOGIC_MODEL` can be changed to another model ID available through OpenRouter. Model availability/IDs can change, so check OpenRouter's model catalog when choosing one.
-
-The OpenRouter key is required only for **AI-assisted semantic analysis**. Local scanning and deterministic n8n reports do not require it.
+The key is needed only for AI-assisted semantic analysis. `scan` and `n8n --report-only` remain local.
 
 ## n8n deep dive
 
-Local structural analysis — no API call:
-
 ```bash
 jsonlogic n8n workflow.json --report-only
-```
-
-Full semantic deep dive through OpenRouter:
-
-```bash
 jsonlogic n8n workflow.json
-```
-
-Other representations:
-
-```bash
 jsonlogic n8n workflow.json --to javascript
 jsonlogic n8n workflow.json --to python
 jsonlogic n8n workflow.json --to typescript
 jsonlogic n8n workflow.json --to mermaid
 ```
 
-Override the configured OpenRouter model for one run:
+## Export a complete report
+
+V5.2 uses `--export` for a complete report. The file extension selects the format.
+
+Markdown:
 
 ```bash
-jsonlogic n8n workflow.json --model <openrouter-model-id>
+jsonlogic n8n workflow.json --export workflow-report.md
 ```
 
-See [n8n Workflow Intelligence](docs/N8N_WORKFLOWS.md).
+PDF:
+
+```bash
+jsonlogic n8n workflow.json --export workflow-report.pdf
+```
+
+Mermaid analysis inside Markdown:
+
+```bash
+jsonlogic n8n workflow.json --to mermaid --export workflow-diagram.md
+```
+
+Mermaid analysis inside PDF:
+
+```bash
+jsonlogic n8n workflow.json --to mermaid --export workflow-diagram.pdf
+```
+
+The complete report contains the source format, provider/model, target view, fidelity score, n8n intelligence report, semantic deep dive, generated logic/code/Mermaid source, assumptions/warnings, and pipeline metadata.
+
+`--out` is different: it saves **only the rendered target output**. For example:
+
+```bash
+jsonlogic n8n workflow.json --to mermaid --out workflow.mmd
+```
+
+Use `--export` when you want a human-readable analysis report and `--out` when you want only the generated artifact/source.
 
 ## Generic JSON
 
+The same export feature works for generic JSON:
+
 ```bash
-jsonlogic explain file.json
-jsonlogic explain file.json --to python
-jsonlogic explain file.json --to javascript
-jsonlogic explain file.json --to typescript
-jsonlogic explain file.json --to mermaid
+jsonlogic explain config.json --export config-analysis.md
+jsonlogic explain config.json --to python --export config-analysis.pdf
 ```
 
-If the file is an n8n export, V5.1 automatically activates n8n-aware analysis.
+If the file is an n8n export, n8n-aware analysis activates automatically.
 
-## Local vs OpenRouter
-
-```text
-JSON Logic Agent
-      │
-      ├── LOCAL
-      │    ├── jsonlogic scan .
-      │    └── jsonlogic n8n workflow.json --report-only
-      │
-      └── OPENROUTER
-           ├── Inspector
-           ├── Logic Architect
-           ├── Ambiguity Critic
-           ├── Generator
-           └── Reviewer
-```
-
-The deterministic n8n analyzer runs before OpenRouter and provides grounded graph evidence: nodes, connections, branch indexes, triggers, decisions, integrations, expressions, credential types, Code/AI nodes, disconnected nodes, terminal paths, and conservative review signals.
-
-## n8n architecture
+## Architecture
 
 ```text
 n8n JSON
-   ↓
-Format detection
    ↓
 Local deterministic n8n analyzer
    ↓
@@ -125,28 +117,11 @@ Inspector → Architect → Critic → LogicModel
 Generator → Reviewer
    ↓
 Logic / Python / JavaScript / TypeScript / Mermaid
+   ↓
+Terminal / Markdown report / PDF report
 ```
 
 Credential secret values must never be exposed. Generated code is conceptual and is never automatically executed.
-
-## Interactive mode
-
-```bash
-jsonlogic scan .
-```
-
-n8n files appear as `[n8n-workflow]`. For scripts/CI:
-
-```bash
-jsonlogic scan . --no-interactive
-jsonlogic scan . --json
-```
-
-Scanning remains local and does not upload every discovered file.
-
-## Claude Code / Codex
-
-You can still launch `claude` or `codex` from this repository to develop or inspect the project. The standalone `jsonlogic explain` / `jsonlogic n8n` semantic commands use the OpenRouter configuration above; `--report-only` remains local.
 
 ## Documentation
 
@@ -162,6 +137,6 @@ You can still launch `claude` or `codex` from this repository to develop or insp
 pytest -q
 ```
 
-Current package version: **0.5.1**.
+Current package version: **0.5.2**.
 
 > **Understand first. Translate second. For n8n, reconstruct the workflow before explaining it.**
