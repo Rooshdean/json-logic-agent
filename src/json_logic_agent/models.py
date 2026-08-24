@@ -3,6 +3,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+OutputTarget = Literal["logic", "python", "javascript", "typescript", "mermaid"]
+
+
 class LogicStep(BaseModel):
     order: int
     title: str
@@ -64,9 +67,25 @@ class PipelineTrace(BaseModel):
 
 class TranslationResult(BaseModel):
     source_name: str
-    target: Literal["logic", "python", "javascript"]
+    target: OutputTarget
     logic: LogicModel
     rendered_output: str
     warnings: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     trace: PipelineTrace | None = None
+
+
+class ScannedJsonFile(BaseModel):
+    path: str
+    size_bytes: int
+    top_level_type: str
+    top_level_keys: list[str] = Field(default_factory=list)
+    likely_kind: str
+    note: str
+
+
+class ProjectScanResult(BaseModel):
+    root: str
+    files: list[ScannedJsonFile] = Field(default_factory=list)
+    skipped_invalid_json: list[str] = Field(default_factory=list)
+    skipped_large_files: list[str] = Field(default_factory=list)
