@@ -2,88 +2,66 @@
 
 ## Project
 
-You are working on **JSON Logic Agent V3**: a developer-focused JSON reverse engineer for people who understand programming but do not necessarily want to read or mentally parse complex JSON.
+You are working on **JSON Logic Agent V4**: an interactive developer-focused JSON reverse engineer for people who understand programming but do not want to mentally parse complex JSON.
 
-A user should be able to say: "show me what this JSON does as normal logic, Python, JavaScript, TypeScript, or a diagram."
+## Primary V4 experience
 
-## Non-negotiable fidelity architecture
+The default human workflow is:
+
+```text
+jsonlogic scan .
+      ↓
+arrow-key file picker
+      ↓
+Explain / Python / JavaScript / TypeScript / Mermaid
+      ↓
+result
+      ↓
+another view / another file / exit
+```
+
+Interactive mode must only auto-start when stdin and stdout are TTYs. Scripts, CI, pipes, and `--no-interactive` must retain deterministic list output. `--json` must always remain machine-readable and non-interactive.
+
+Project scanning remains local. Do not send all discovered files to a model merely to populate the picker.
+
+## Non-negotiable semantic architecture
 
 Preserve:
 
-`JSON -> Inspector -> Logic Architect -> Ambiguity Critic -> LogicModel -> Generator -> Code Reviewer -> output`
+`JSON -> Inspector -> Logic Architect -> Ambiguity Critic -> LogicModel -> Generator -> Reviewer -> output`
 
-`LogicModel` is canonical. Never implement a direct JSON-to-code shortcut.
-
-## V3 developer experience
-
-Primary commands:
-
-```bash
-jsonlogic scan .
-jsonlogic explain file.json
-jsonlogic explain file.json --to python
-jsonlogic explain file.json --to javascript
-jsonlogic explain file.json --to typescript
-jsonlogic explain file.json --to mermaid
-```
-
-The old `jsonlogic file.json --to ...` syntax should remain compatible.
-
-Project scanning must remain local/deterministic by default. Do not send every discovered project file to a model merely to list/classify files.
-
-## Stage ownership
-
-- Inspector: structure, candidates, ambiguity, confidence.
-- Architect: evidence-backed canonical LogicModel.
-- Critic: challenge assumptions, missing branches, and ordering.
-- Generator: render only from final LogicModel, using source for fidelity context.
-- Reviewer: compare output with source + LogicModel and correct semantic drift.
+`LogicModel` is canonical. Never implement direct JSON-to-code conversion.
 
 ## Supported targets
 
 `logic`, `python`, `javascript`, `typescript`, `mermaid`.
 
-New targets must consume the final LogicModel.
-
-## Behavior
-
-- Optimize explanations for developers who understand code but may dislike JSON.
-- Explain purpose and flow, not just keys.
-- Never invent missing business rules.
-- Preserve conditions, defaults, branches, and order.
-- Mark unresolved external behavior with TODOs/placeholders.
-- Identify data-only JSON honestly.
-- Never auto-execute generated code.
-
-## Development workflow
-
-Before and after edits:
-
-```bash
-pytest -q
-```
-
-Useful debugging:
-
-```bash
-jsonlogic scan .
-jsonlogic explain examples/order_workflow.json --show-trace
-```
-
 ## Important files
 
-- `src/json_logic_agent/agent.py` — five-stage orchestration.
-- `src/json_logic_agent/models.py` — canonical semantic/stage models.
-- `src/json_logic_agent/prompts.py` — role prompts and render targets.
-- `src/json_logic_agent/scanner.py` — local project discovery/classification.
-- `src/json_logic_agent/cli.py` — V3 developer UX.
-- `docs/V2_ARCHITECTURE.md` — fidelity-stage contract inherited by V3.
+- `src/json_logic_agent/interactive.py` — V4 terminal menus and action mapping.
+- `src/json_logic_agent/cli.py` — TTY detection and CLI orchestration.
+- `src/json_logic_agent/scanner.py` — local deterministic JSON discovery.
+- `src/json_logic_agent/agent.py` — semantic pipeline.
+- `src/json_logic_agent/models.py` — typed contracts and LogicModel.
+- `src/json_logic_agent/prompts.py` — semantic/render prompts.
 
-## V3.x priorities
+## Development rules
 
-1. interactive terminal picker after project scan;
-2. multi-file/system explanation with explicit user selection;
-3. dependency graph across related JSON files;
-4. provider abstraction;
-5. confidence-based clarification;
-6. MCP server mode.
+- Python 3.10+.
+- Run `pytest -q` before and after edits.
+- Keep the interactive layer thin; it should select a file and target, then call the existing semantic pipeline.
+- Do not duplicate semantic logic inside the UI.
+- Preserve direct `jsonlogic explain ...` commands and legacy syntax.
+- Never auto-execute generated code.
+- Never invent missing business rules.
+- New output views must consume final LogicModel.
+
+## V4.x priorities
+
+1. search/filter inside the interactive file picker;
+2. optional preview panel with file classification/keys before selection;
+3. explicit multi-select for related JSON files and system-level explanation;
+4. dependency graph across selected files;
+5. provider abstraction;
+6. confidence-based clarification;
+7. MCP mode.
