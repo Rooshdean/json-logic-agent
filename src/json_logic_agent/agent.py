@@ -1,16 +1,38 @@
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from openai import OpenAI
+from pydantic import BaseModel
 
-from .models import LogicModel, TranslationResult
-from .prompts import SYSTEM_PROMPT, build_analysis_prompt, build_render_prompt
+from .models import (
+    CritiqueReport,
+    InspectionReport,
+    LogicModel,
+    PipelineTrace,
+    ReviewReport,
+    TranslationResult,
+)
+from .prompts import (
+    SYSTEM_PROMPT,
+    build_architect_prompt,
+    build_critic_prompt,
+    build_inspector_prompt,
+    build_render_prompt,
+    build_reviewer_prompt,
+    build_revision_prompt,
+)
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class JsonLogicAgent:
-    """Translate JSON into a normalized logic model and optional source code."""
+    """V2 multi-agent JSON reasoning pipeline.
+
+    Pipeline:
+        Inspector -> Logic Architect -> Ambiguity Critic -> Code Generator -> Code Reviewer
+    """
 
     def __init__(self, model: str | None = None, client: OpenAI | None = None):
         self.model = model or os.getenv("JSON_LOGIC_MODEL", "gpt-5.6")
@@ -28,53 +50,177 @@ class JsonLogicAgent:
             raw = raw.rsplit("```", 1)[0].strip()
         return raw
 
-    def analyze(self, data: Any, source_name: str = "input.json") -> LogicModel:
-        json_text = self._normalize_json(data)
+    def _call_text(self, prompt: str) -> str:
         response = self.client.responses.create(
             model=self.model,
             instructions=SYSTEM_PROMPT,
-            input=build_analysis_prompt(source_name, json_text),
+            input=prompt,
         )
-        raw = self._strip_markdown_fence(response.output_text)
-        return LogicModel.model_validate_json(raw)
+        return response.output_text.strip()
+
+    def _call_model(self, prompt: str, model_type: type[ModelT]) -> ModelT:
+        raw = self._strip_markdown_fence(self._call_text(prompt))
+        return model_type.model_validate_json(raw)
+
+    def inspect(self, data: Any, source_name: str = "input.json") -> InspectionReport:
+        return self._call_model(
+            build_inspector_prompt(source_name, self._normalize_json(data)),
+            InspectionReport,
+        )
+
+    def architect(
+        self,
+        data: Any,
+        inspection: InspectionReport,
+        source_name: str = "input.json",
+    ) -> LogicModel:
+        return self._call_model(
+            build_architect_prompt(
+                source_name,
+                self._normalize_json(data),
+                inspection.model_dump_json(indent=2),
+            ),
+            LogicModel,
+        )
+
+    def critique(
+        self,
+        data: Any,
+        inspection: InspectionReport,
+        logic: LogicModel,
+    ) -> CritiqueReport:
+        return self._call_model(
+            build_critic_prompt(
+                self._normalize_json(data),
+                inspection.model_dump_json(indent=2),
+                logic.model_dump_json(indent=2),
+            ),
+            CritiqueReport,
+        )
+
+    def revise(
+        self,
+        data: Any,
+        logic: LogicModel,
+        critique: CritiqueReport,
+    ) -> LogicModel:
+        if critique.verdict == "accept":
+            return logic
+        return self._call_model(
+            build_revision_prompt(
+                self._normalize_json(data),
+                logic.model_dump_json(indent=2),
+                critique.model_dump_json(indent=2),
+            ),
+            LogicModel,
+        )
+
+    def analyze(self, data: Any, source_name: str = "input.json") -> LogicModel:
+        """Backward-compatible semantic analysis entry point."""
+        inspection = self.inspect(data, source_name=source_name)
+        draft = self.architect(data, inspection, source_name=source_name)
+        critique = self.critique(data, inspection, draft)
+        return self.revise(data, draft, critique)
 
     def render(self, data: Any, logic: LogicModel, target: str) -> str:
         if target not in {"logic", "python", "javascript"}:
             raise ValueError("target must be one of: logic, python, javascript")
-
-        response = self.client.responses.create(
-            model=self.model,
-            instructions=SYSTEM_PROMPT,
-            input=build_render_prompt(
+        rendered = self._call_text(
+            build_render_prompt(
                 target,
                 logic.model_dump_json(indent=2),
                 self._normalize_json(data),
-            ),
+            )
         )
-        rendered = response.output_text.strip()
         if target in {"python", "javascript"}:
             rendered = self._strip_markdown_fence(rendered)
         return rendered
+
+    def review(
+        self,
+        data: Any,
+        logic: LogicModel,
+        target: str,
+        rendered_output: str,
+    ) -> ReviewReport:
+        return self._call_model(
+            build_reviewer_prompt(
+                target,
+                self._normalize_json(data),
+                logic.model_dump_json(indent=2),
+                rendered_output,
+            ),
+            ReviewReport,
+        )
 
     def translate(
         self,
         data: Any,
         target: str = "logic",
         source_name: str = "input.json",
+        include_trace: bool = True,
     ) -> TranslationResult:
-        logic = self.analyze(data, source_name=source_name)
-        rendered = self.render(data, logic, target)
+        inspection = self.inspect(data, source_name=source_name)
+        draft_logic = self.architect(data, inspection, source_name=source_name)
+        critique = self.critique(data, inspection, draft_logic)
+        final_logic = self.revise(data, draft_logic, critique)
+
+        rendered = self.render(data, final_logic, target)
+        review = self.review(data, final_logic, target, rendered)
+        if review.verdict == "revise" and review.corrected_output:
+            rendered = review.corrected_output.strip()
+            if target in {"python", "javascript"}:
+                rendered = self._strip_markdown_fence(rendered)
+
+        warnings = list(final_logic.assumptions)
+        warnings.extend(inspection.ambiguities)
+        warnings.extend(critique.semantic_risks)
+        warnings.extend(review.issues)
+        warnings = list(dict.fromkeys(warnings))
+
+        trace = None
+        if include_trace:
+            trace = PipelineTrace(
+                inspection=inspection,
+                draft_logic=draft_logic,
+                critique=critique,
+                final_logic=final_logic,
+                review=review,
+            )
+
         return TranslationResult(
             source_name=source_name,
             target=target,
-            logic=logic,
+            logic=final_logic,
             rendered_output=rendered,
-            warnings=list(logic.assumptions),
-            metadata={"model": self.model},
+            warnings=warnings,
+            metadata={
+                "model": self.model,
+                "pipeline": "v2",
+                "stages": [
+                    "inspector",
+                    "architect",
+                    "critic",
+                    "generator",
+                    "reviewer",
+                ],
+                "fidelity_score": review.fidelity_score,
+            },
+            trace=trace,
         )
 
-    def translate_file(self, path: str | Path, target: str = "logic") -> TranslationResult:
+    def translate_file(
+        self,
+        path: str | Path,
+        target: str = "logic",
+        include_trace: bool = True,
+    ) -> TranslationResult:
         file_path = Path(path)
         with file_path.open("r", encoding="utf-8") as fh:
             data = json.load(fh)
-        return self.translate(data, target=target, source_name=file_path.name)
+        return self.translate(
+            data,
+            target=target,
+            source_name=file_path.name,
+            include_trace=include_trace,
+        )
