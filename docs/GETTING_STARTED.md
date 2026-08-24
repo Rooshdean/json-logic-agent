@@ -1,130 +1,176 @@
-# Getting Started with JSON Logic Agent V5.1
+# Getting Started — JSON Logic Agent V5.2
 
-JSON Logic Agent helps developers understand unfamiliar JSON and exported n8n workflows. Standalone AI-assisted analysis uses OpenRouter; local scanning and n8n structural reports require no API key.
+This is the short first-run checklist. For the full walkthrough and troubleshooting, see the main README.
 
-## 1. Install Python 3.10+
-
-Check:
+## Step 1 — Check Python
 
 ```bash
 python3 --version
 ```
 
-If macOS reports Python 3.9.x and you use Homebrew:
+Python 3.10+ is required. macOS users with Python 3.9 can install 3.12:
 
 ```bash
 brew install python@3.12
 ```
 
-## 2. Install JSON Logic Agent
+## Step 2 — Clone
 
 ```bash
 git clone https://github.com/Rooshdean/json-logic-agent.git
 cd json-logic-agent
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -e .
 ```
 
-## 3. Configure OpenRouter
+## Step 3 — Create and activate the virtual environment
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python --version
+```
+
+The final command must report Python 3.10+.
+
+## Step 4 — Install
+
+```bash
+pip install --upgrade pip
+pip install -e .
+jsonlogic --help
+```
+
+## Step 5 — Configure OpenRouter
 
 ```bash
 cp .env.example .env
+nano .env
 ```
 
-Edit `.env`:
+Add:
 
 ```text
 OPENROUTER_API_KEY=your-openrouter-key
 JSON_LOGIC_MODEL=anthropic/claude-sonnet-4
 ```
 
-Use any currently available OpenRouter model ID you prefer.
+Save Nano with `Ctrl+O`, Enter, `Ctrl+X`.
 
-## 4. Verify local functionality first
+Never commit `.env` or share the real key.
+
+## Step 6 — Verify local n8n analysis
 
 ```bash
-jsonlogic --help
 jsonlogic n8n examples/n8n_customer_workflow.json --report-only
 ```
 
-The second command performs deterministic n8n analysis locally and does not use OpenRouter.
+This does not use OpenRouter.
 
-## 5. Run AI-assisted analysis
+Expected signs of success include:
+
+```text
+Workflow: Customer Intake Example
+Nodes: 4
+Triggers: Customer Webhook
+Decision nodes: Has Email?
+```
+
+## Step 7 — Verify OpenRouter
 
 ```bash
 jsonlogic n8n examples/n8n_customer_workflow.json
 ```
 
-Or:
+You should receive the local workflow intelligence followed by `SEMANTIC DEEP DIVE`, a fidelity score, and warnings.
+
+## Step 8 — Analyze your workflow
 
 ```bash
-jsonlogic n8n workflow.json --to javascript
-jsonlogic n8n workflow.json --to python
-jsonlogic n8n workflow.json --to typescript
-jsonlogic n8n workflow.json --to mermaid
+jsonlogic n8n ~/Downloads/my-workflow.json
 ```
 
-Override the OpenRouter model per run:
+Alternative views:
 
 ```bash
-jsonlogic n8n workflow.json --model <openrouter-model-id>
+jsonlogic n8n ~/Downloads/my-workflow.json --to javascript
+jsonlogic n8n ~/Downloads/my-workflow.json --to python
+jsonlogic n8n ~/Downloads/my-workflow.json --to typescript
+jsonlogic n8n ~/Downloads/my-workflow.json --to mermaid
 ```
 
-## 6. Interactive project mode
+## Step 9 — Export it
+
+Markdown:
+
+```bash
+jsonlogic n8n ~/Downloads/my-workflow.json --export workflow-report.md
+```
+
+PDF:
+
+```bash
+jsonlogic n8n ~/Downloads/my-workflow.json --export workflow-report.pdf
+```
+
+Mermaid PDF report:
+
+```bash
+jsonlogic n8n ~/Downloads/my-workflow.json --to mermaid --export workflow-diagram.pdf
+```
+
+## Step 10 — Browse a whole project
 
 ```bash
 jsonlogic scan .
 ```
 
-Use arrow keys to choose a file and representation. n8n exports are detected automatically.
+Use arrow keys to select discovered JSON files and choose the representation you want.
 
-## 7. Generic JSON
-
-```bash
-jsonlogic explain config.json
-jsonlogic explain config.json --to javascript
-```
-
-## 8. Local vs OpenRouter
-
-Local/no API call:
+## Step 11 — Claude Code
 
 ```bash
-jsonlogic scan . --no-interactive
-jsonlogic scan . --json
-jsonlogic n8n workflow.json --report-only
-```
-
-OpenRouter semantic analysis:
-
-```bash
-jsonlogic explain file.json
-jsonlogic n8n workflow.json
-```
-
-## 9. Claude Code / Codex
-
-From the repo:
-
-```bash
+cd ~/json-logic-agent
+source .venv/bin/activate
 claude
 ```
 
-or:
+Suggested first prompt:
+
+```text
+Read CLAUDE.md, README.md and docs/N8N_WORKFLOWS.md.
+Run pytest -q first.
+Then use JSON Logic Agent to analyze examples/n8n_customer_workflow.json.
+```
+
+## Step 12 — Codex
 
 ```bash
+cd ~/json-logic-agent
+source .venv/bin/activate
 codex
 ```
 
-Claude Code/Codex can inspect and develop the repository. When they invoke the standalone `jsonlogic n8n` or `jsonlogic explain` semantic commands, those commands use your OpenRouter configuration.
+Suggested first prompt:
 
-## Troubleshooting
+```text
+Read AGENTS.md, README.md and docs/N8N_WORKFLOWS.md.
+Run pytest -q first.
+Then use JSON Logic Agent to analyze examples/n8n_customer_workflow.json.
+```
 
-If installation says Python 3.9 is unsupported, rebuild the virtual environment explicitly with Python 3.12:
+## Updating later
 
 ```bash
+cd ~/json-logic-agent
+git pull
+source .venv/bin/activate
+pip install -e .
+```
+
+## Common Python 3.9 fix
+
+```bash
+brew install python@3.12
+cd ~/json-logic-agent
 rm -rf .venv
 python3.12 -m venv .venv
 source .venv/bin/activate
@@ -132,6 +178,4 @@ pip install --upgrade pip
 pip install -e .
 ```
 
-If semantic analysis reports `OPENROUTER_API_KEY is required`, check that `.env` exists in the repo root and contains your key.
-
-If you do not want an API call, use `--report-only` for n8n structural analysis.
+For detailed troubleshooting, architecture, security notes, `--out` vs `--export`, generic JSON usage, and examples, return to the main README.
