@@ -1,20 +1,121 @@
-# JSON Logic Agent V3
+# JSON Logic Agent V4
 
 > **Understand JSON without having to think in JSON.**
 
-JSON Logic Agent helps developers understand large, nested, or unfamiliar JSON files by translating their meaning into something easier to read.
+JSON Logic Agent is for developers who understand code but do not want to mentally parse large, nested, or unfamiliar JSON.
 
-You can turn JSON into:
+V4 adds an **interactive terminal browser**. You can scan a project, use your arrow keys to choose a JSON file, and then choose how you want to understand it — no command memorization required.
 
-- plain English logic
-- Python
-- JavaScript
-- TypeScript
-- Mermaid flow diagrams
+## The easiest way to use it
 
-## The simplest example
+```bash
+jsonlogic scan .
+```
 
-You have this:
+In a normal terminal, V4 opens an interactive picker:
+
+```text
+? Choose a JSON file:
+❯ workflows/approval.json  [workflow-or-automation]
+  permissions.json         [access-policy]
+  config.json              [configuration]
+  package.json             [node-package-manifest]
+  Exit
+```
+
+Press **↑ / ↓** and **Enter**. Then choose:
+
+```text
+? What would you like to do with workflows/approval.json?
+❯ Explain in normal logic
+  Show as Python
+  Show as JavaScript
+  Show as TypeScript
+  Draw as Mermaid diagram
+  Choose another file
+  Exit
+```
+
+After viewing the result, you can view the same file another way, choose another JSON file, or exit.
+
+That is the main V4 workflow.
+
+---
+
+## Quick start
+
+```bash
+git clone https://github.com/Rooshdean/json-logic-agent.git
+cd json-logic-agent
+chmod +x scripts/*.sh
+./scripts/setup.sh
+source .venv/bin/activate
+```
+
+Copy the environment file:
+
+```bash
+cp .env.example .env
+```
+
+Add your OpenAI API key to `.env`:
+
+```text
+OPENAI_API_KEY=your-api-key-here
+```
+
+Then run:
+
+```bash
+jsonlogic scan .
+```
+
+For a detailed walkthrough, see [Getting Started](docs/GETTING_STARTED.md).
+
+---
+
+## You can still use direct commands
+
+If you already know which file you want:
+
+```bash
+# Normal explanation
+jsonlogic explain workflow.json
+
+# Python
+jsonlogic explain workflow.json --to python
+
+# JavaScript
+jsonlogic explain workflow.json --to javascript
+
+# TypeScript
+jsonlogic explain workflow.json --to typescript
+
+# Flow diagram
+jsonlogic explain workflow.json --to mermaid
+```
+
+Save output with:
+
+```bash
+jsonlogic explain workflow.json --to python --out workflow.py
+```
+
+---
+
+## What V4 can show you
+
+| View | What it is for |
+| --- | --- |
+| Normal logic | Understand what the JSON is doing without code |
+| Python | See the behavior as familiar Python logic |
+| JavaScript | See conditions and flow as modern JavaScript |
+| TypeScript | JavaScript-style logic with useful inferred types |
+| Mermaid | Visualize execution flow and branches |
+
+## Example
+
+Given:
 
 ```json
 {
@@ -29,13 +130,7 @@ You have this:
 }
 ```
 
-Instead of manually working through the JSON, run:
-
-```bash
-jsonlogic explain workflow.json
-```
-
-The goal is an explanation similar to:
+Normal logic might be represented as:
 
 ```text
 When an order is created, check its total.
@@ -47,231 +142,79 @@ Otherwise:
   Auto-approve the order.
 ```
 
-Or ask to see the same meaning as code:
-
-```bash
-jsonlogic explain workflow.json --to javascript
-jsonlogic explain workflow.json --to python
-```
-
-That is the core purpose of JSON Logic Agent.
+A JavaScript developer can instead choose **Show as JavaScript** and reason about the same behavior in familiar syntax.
 
 ---
 
-## Quick start
+## Interactive vs non-interactive scan
 
-### 1. Clone
+`jsonlogic scan .` is interactive only when running in a real terminal.
 
-```bash
-git clone https://github.com/Rooshdean/json-logic-agent.git
-cd json-logic-agent
-```
+This means shell scripts, CI jobs, pipes, and redirected output remain predictable.
 
-### 2. Set up
+Force the traditional list view with:
 
 ```bash
-chmod +x scripts/*.sh
-./scripts/setup.sh
-source .venv/bin/activate
+jsonlogic scan . --no-interactive
 ```
 
-### 3. Configure your API key
+Get machine-readable scan data with:
 
 ```bash
-cp .env.example .env
+jsonlogic scan . --json
 ```
 
-Open `.env` and add your OpenAI API key:
+Project scanning itself is local and deterministic. The scanner does **not** upload every JSON file it discovers. A selected file enters the AI semantic pipeline only when you choose a view for it.
+
+Common vendor/generated directories such as `.git`, `.venv`, `node_modules`, `dist`, `build`, and `.next` are ignored.
+
+---
+
+## Why the tool does not translate JSON directly to code
+
+A direct AI conversion can produce code that looks good but subtly changes the meaning.
+
+JSON Logic Agent uses this pipeline:
 
 ```text
-OPENAI_API_KEY=your-api-key-here
+JSON
+ ↓
+Inspector
+ ↓
+Logic Architect
+ ↓
+Ambiguity Critic
+ ↓
+LogicModel
+ ↓
+Generator
+ ↓
+Reviewer
+ ↓
+Final view + fidelity score
 ```
 
-Never commit your real API key.
+`LogicModel` is the semantic boundary. The agent first determines what the JSON appears to mean, challenges that interpretation, and only then renders Python, JavaScript, TypeScript, normal logic, or Mermaid.
 
-### 4. Test it
+The reviewer compares the final representation against both the original JSON and `LogicModel`.
 
-```bash
-jsonlogic explain examples/order_workflow.json
-```
+## Fidelity score
 
-For a full beginner walkthrough, read [Getting Started](docs/GETTING_STARTED.md).
-
----
-
-## What do you want to do?
-
-| I want to... | Run this |
-| --- | --- |
-| Find JSON files in a project | `jsonlogic scan .` |
-| Understand a JSON file normally | `jsonlogic explain file.json` |
-| See the logic as Python | `jsonlogic explain file.json --to python` |
-| See the logic as JavaScript | `jsonlogic explain file.json --to javascript` |
-| See the logic as TypeScript | `jsonlogic explain file.json --to typescript` |
-| Draw the workflow | `jsonlogic explain file.json --to mermaid` |
-| Save generated output | `jsonlogic explain file.json --to python --out output.py` |
-| See how the agent interpreted it | `jsonlogic explain file.json --show-trace` |
-
-See the full [Command Reference](docs/COMMANDS.md).
-
----
-
-## Start with an unfamiliar project
-
-If you do not even know which JSON file matters, run:
-
-```bash
-cd some-project
-jsonlogic scan .
-```
-
-You may see something like:
-
-```text
-package.json
-  → node-package-manifest
-
-config.json
-  → configuration
-
-permissions.json
-  → access-policy
-
-workflows/approval.json
-  → workflow-or-automation
-```
-
-Then inspect the file you care about:
-
-```bash
-jsonlogic explain workflows/approval.json
-```
-
-Or translate its logic into the language you are more comfortable with:
-
-```bash
-jsonlogic explain workflows/approval.json --to javascript
-```
-
-`scan` is local and deterministic. It does **not** automatically upload every JSON file in the project to the model.
-
----
-
-## Output formats
-
-### Normal logic
-
-```bash
-jsonlogic explain file.json
-```
-
-Best when you simply want to know what the file is doing.
-
-### Python
-
-```bash
-jsonlogic explain file.json --to python
-```
-
-Best when Python is easier for you to reason about than JSON.
-
-### JavaScript
-
-```bash
-jsonlogic explain file.json --to javascript
-```
-
-Best for JavaScript developers who want to see conditions and flow represented as familiar code.
-
-### TypeScript
-
-```bash
-jsonlogic explain file.json --to typescript
-```
-
-Similar to JavaScript, with useful types/interfaces where the JSON supports them.
-
-### Mermaid
-
-```bash
-jsonlogic explain file.json --to mermaid
-```
-
-Produces Mermaid flowchart source so you can visualize workflows and branches.
-
----
-
-## Why not just ask an AI to convert JSON directly to code?
-
-Because a direct conversion can look convincing while changing the meaning.
-
-JSON Logic Agent uses a reviewed semantic pipeline:
-
-```text
-                     ┌─────────────────┐
-JSON ──► Inspector ─►│ Logic Architect │
-                     └────────┬────────┘
-                              ▼
-                           Critic
-                              ▼
-                         LogicModel
-                              ▼
-                          Generator
-                              ▼
-                           Reviewer
-                              ▼
-              Logic / Python / JS / TS / Mermaid
-```
-
-The important part is `LogicModel`.
-
-The agent first tries to understand what the JSON means. Only after that interpretation has been challenged does it generate your preferred representation.
-
-The final reviewer checks the generated output against both the original JSON and the semantic model and reports a **fidelity score**.
-
----
-
-## What the fidelity score means
-
-A translation ends with a score such as:
+Each semantic translation reports a score such as:
 
 ```text
 Fidelity score: 96/100
 ```
 
-This is the reviewer's estimate of how faithfully the generated representation preserves the meaning supported by the source JSON.
+This is the reviewer's estimate of how closely the output preserves the meaning supported by the source JSON. It is not a mathematical guarantee, and generated code should be reviewed before production use.
 
-It is not a mathematical guarantee. Generated output should still be reviewed before being used as production code.
-
----
-
-## When the JSON is ambiguous
-
-JSON does not always contain enough information to know exactly what an application does.
-
-JSON Logic Agent is designed to expose that uncertainty instead of quietly inventing missing behavior.
-
-Run:
+For difficult files, inspect the pipeline:
 
 ```bash
 jsonlogic explain file.json --show-trace
 ```
 
-This lets you inspect:
-
-```text
-InspectionReport
-      ↓
-Draft LogicModel
-      ↓
-CritiqueReport
-      ↓
-Final LogicModel
-      ↓
-ReviewReport
-```
-
-Save it with:
+Or save it:
 
 ```bash
 jsonlogic explain file.json --trace-out trace.json
@@ -280,8 +223,6 @@ jsonlogic explain file.json --trace-out trace.json
 ---
 
 ## What JSON can it help with?
-
-Examples include:
 
 - workflows and automations
 - rules engines
@@ -293,69 +234,32 @@ Examples include:
 - infrastructure configuration
 - ordinary JSON data
 
-Not every JSON file contains logic. If a file is just data, the agent should say so rather than inventing executable behavior.
+If a JSON file is simply data, the agent should say that rather than inventing executable logic.
 
 ---
 
-## Using it with Claude Code
-
-After cloning and setting up the repository:
+## Claude Code
 
 ```bash
 claude
 ```
 
-Suggested first prompt:
+Suggested prompt:
 
 ```text
-Read CLAUDE.md, AGENTS.md and README.md. Run the tests. Explain how JSON Logic Agent V3 works before making changes.
+Read CLAUDE.md, AGENTS.md and README.md. Run the tests and explain JSON Logic Agent V4 before making changes. Preserve the interactive scan UX and the LogicModel fidelity pipeline.
 ```
 
-`CLAUDE.md` contains project-specific instructions for Claude Code.
-
----
-
-## Using it with Codex
+## Codex
 
 ```bash
 codex
 ```
 
-Suggested first prompt:
+Suggested prompt:
 
 ```text
-Read AGENTS.md and README.md. Run the tests. Explain how JSON Logic Agent V3 works before making changes.
-```
-
-`AGENTS.md` contains repository instructions for Codex.
-
----
-
-## Programmatic usage
-
-```python
-from json_logic_agent import JsonLogicAgent
-
-agent = JsonLogicAgent()
-
-result = agent.translate_file(
-    "workflow.json",
-    target="javascript",
-)
-
-print(result.rendered_output)
-print(result.metadata["fidelity_score"])
-```
-
-Project scanning:
-
-```python
-from json_logic_agent.scanner import scan_project
-
-result = scan_project(".")
-
-for file in result.files:
-    print(file.path, file.likely_kind)
+Read AGENTS.md and README.md. Run the tests and explain JSON Logic Agent V4 before making changes. Preserve the interactive scan UX and the LogicModel fidelity pipeline.
 ```
 
 ---
@@ -364,30 +268,18 @@ for file in result.files:
 
 - [Getting Started](docs/GETTING_STARTED.md) — installation and first use
 - [Command Reference](docs/COMMANDS.md) — CLI commands and options
-- [V2 Architecture](docs/V2_ARCHITECTURE.md) — detailed fidelity pipeline inherited by V3
-- [CLAUDE.md](CLAUDE.md) — instructions for Claude Code
-- [AGENTS.md](AGENTS.md) — instructions for Codex and coding agents
-
----
+- [V2 Architecture](docs/V2_ARCHITECTURE.md) — underlying semantic fidelity architecture
+- [CLAUDE.md](CLAUDE.md) — Claude Code instructions
+- [AGENTS.md](AGENTS.md) — Codex/coding-agent instructions
 
 ## Development
-
-Run tests:
 
 ```bash
 pytest -q
 ```
 
-Or:
-
-```bash
-make test
-```
-
-Current package version: **0.3.0**.
+Current package version: **0.4.0**.
 
 ## Core rule
 
 > **Understand first. Translate second.**
-
-JSON Logic Agent should never produce nicer-looking code at the expense of changing what the JSON actually says.
