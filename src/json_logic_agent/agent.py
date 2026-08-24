@@ -13,14 +13,31 @@ from .prompts import SYSTEM_PROMPT, build_architect_prompt, build_critic_prompt,
 ModelT = TypeVar("ModelT", bound=BaseModel)
 SUPPORTED_TARGETS = {"logic", "python", "javascript", "typescript", "mermaid"}
 CODE_TARGETS = {"python", "javascript", "typescript"}
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_MODEL = "anthropic/claude-sonnet-4"
 
 
 class JsonLogicAgent:
-    """V5 JSON + n8n workflow reverse-engineering agent."""
+    """V5 JSON + n8n workflow reverse-engineering agent using OpenRouter."""
 
     def __init__(self, model: str | None = None, client: OpenAI | None = None):
-        self.model = model or os.getenv("JSON_LOGIC_MODEL", "gpt-5.6")
-        self.client = client or OpenAI()
+        self.model = model or os.getenv("JSON_LOGIC_MODEL", DEFAULT_MODEL)
+        if client is not None:
+            self.client = client
+        else:
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if not api_key:
+                raise RuntimeError(
+                    "OPENROUTER_API_KEY is required for semantic analysis. "
+                    "Local commands such as `jsonlogic n8n workflow.json --report-only` do not require a key."
+                )
+            self.client = OpenAI(
+                base_url=OPENROUTER_BASE_URL,
+                api_key=api_key,
+                default_headers={
+                    "X-Title": "JSON Logic Agent",
+                },
+            )
 
     @staticmethod
     def _normalize_json(data: Any) -> str:
@@ -42,8 +59,17 @@ class JsonLogicAgent:
         return None, None
 
     def _call_text(self, prompt: str) -> str:
-        response = self.client.responses.create(model=self.model, instructions=SYSTEM_PROMPT, input=prompt)
-        return response.output_text.strip()
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        content = response.choices[0].message.content
+        if not content:
+            raise RuntimeError("OpenRouter returned an empty response")
+        return content.strip()
 
     def _call_model(self, prompt: str, model_type: type[ModelT]) -> ModelT:
         raw = self._strip_markdown_fence(self._call_text(prompt))
@@ -105,6 +131,7 @@ class JsonLogicAgent:
             rendered_output=rendered,
             warnings=warnings,
             metadata={
+                "provider": "openrouter",
                 "model": self.model,
                 "pipeline": "v5",
                 "stages": ["format-detection", "n8n-analysis" if n8n_report else "generic-json", "inspector", "architect", "critic", "generator", "reviewer"],
