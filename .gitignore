@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.py[cod]
@@ -9,3 +11,13 @@ dist/
 build/
 *.egg-info/
 .DS_Store
+
+# Local credentials / keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Recommended destinations for generated analyses that may contain sensitive workflow data
+reports/
+exports/
