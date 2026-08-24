@@ -10,6 +10,7 @@ from .models import (
     CritiqueReport,
     InspectionReport,
     LogicModel,
+    OutputTarget,
     PipelineTrace,
     ReviewReport,
     TranslationResult,
@@ -25,13 +26,15 @@ from .prompts import (
 )
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
+SUPPORTED_TARGETS = {"logic", "python", "javascript", "typescript", "mermaid"}
+CODE_TARGETS = {"python", "javascript", "typescript"}
 
 
 class JsonLogicAgent:
-    """V2 multi-agent JSON reasoning pipeline.
+    """V3 developer-focused JSON reverse-engineering agent.
 
-    Pipeline:
-        Inspector -> Logic Architect -> Ambiguity Critic -> Code Generator -> Code Reviewer
+    Fidelity pipeline:
+        Inspector -> Logic Architect -> Ambiguity Critic -> Generator -> Reviewer
     """
 
     def __init__(self, model: str | None = None, client: OpenAI | None = None):
@@ -64,16 +67,10 @@ class JsonLogicAgent:
 
     def inspect(self, data: Any, source_name: str = "input.json") -> InspectionReport:
         return self._call_model(
-            build_inspector_prompt(source_name, self._normalize_json(data)),
-            InspectionReport,
+            build_inspector_prompt(source_name, self._normalize_json(data)), InspectionReport
         )
 
-    def architect(
-        self,
-        data: Any,
-        inspection: InspectionReport,
-        source_name: str = "input.json",
-    ) -> LogicModel:
+    def architect(self, data: Any, inspection: InspectionReport, source_name: str = "input.json") -> LogicModel:
         return self._call_model(
             build_architect_prompt(
                 source_name,
@@ -83,12 +80,7 @@ class JsonLogicAgent:
             LogicModel,
         )
 
-    def critique(
-        self,
-        data: Any,
-        inspection: InspectionReport,
-        logic: LogicModel,
-    ) -> CritiqueReport:
+    def critique(self, data: Any, inspection: InspectionReport, logic: LogicModel) -> CritiqueReport:
         return self._call_model(
             build_critic_prompt(
                 self._normalize_json(data),
@@ -98,12 +90,7 @@ class JsonLogicAgent:
             CritiqueReport,
         )
 
-    def revise(
-        self,
-        data: Any,
-        logic: LogicModel,
-        critique: CritiqueReport,
-    ) -> LogicModel:
+    def revise(self, data: Any, logic: LogicModel, critique: CritiqueReport) -> LogicModel:
         if critique.verdict == "accept":
             return logic
         return self._call_model(
@@ -116,33 +103,22 @@ class JsonLogicAgent:
         )
 
     def analyze(self, data: Any, source_name: str = "input.json") -> LogicModel:
-        """Backward-compatible semantic analysis entry point."""
         inspection = self.inspect(data, source_name=source_name)
         draft = self.architect(data, inspection, source_name=source_name)
         critique = self.critique(data, inspection, draft)
         return self.revise(data, draft, critique)
 
-    def render(self, data: Any, logic: LogicModel, target: str) -> str:
-        if target not in {"logic", "python", "javascript"}:
-            raise ValueError("target must be one of: logic, python, javascript")
+    def render(self, data: Any, logic: LogicModel, target: OutputTarget) -> str:
+        if target not in SUPPORTED_TARGETS:
+            raise ValueError(f"target must be one of: {', '.join(sorted(SUPPORTED_TARGETS))}")
         rendered = self._call_text(
-            build_render_prompt(
-                target,
-                logic.model_dump_json(indent=2),
-                self._normalize_json(data),
-            )
+            build_render_prompt(target, logic.model_dump_json(indent=2), self._normalize_json(data))
         )
-        if target in {"python", "javascript"}:
+        if target in CODE_TARGETS or target == "mermaid":
             rendered = self._strip_markdown_fence(rendered)
         return rendered
 
-    def review(
-        self,
-        data: Any,
-        logic: LogicModel,
-        target: str,
-        rendered_output: str,
-    ) -> ReviewReport:
+    def review(self, data: Any, logic: LogicModel, target: OutputTarget, rendered_output: str) -> ReviewReport:
         return self._call_model(
             build_reviewer_prompt(
                 target,
@@ -156,7 +132,7 @@ class JsonLogicAgent:
     def translate(
         self,
         data: Any,
-        target: str = "logic",
+        target: OutputTarget = "logic",
         source_name: str = "input.json",
         include_trace: bool = True,
     ) -> TranslationResult:
@@ -164,29 +140,28 @@ class JsonLogicAgent:
         draft_logic = self.architect(data, inspection, source_name=source_name)
         critique = self.critique(data, inspection, draft_logic)
         final_logic = self.revise(data, draft_logic, critique)
-
         rendered = self.render(data, final_logic, target)
         review = self.review(data, final_logic, target, rendered)
+
         if review.verdict == "revise" and review.corrected_output:
             rendered = review.corrected_output.strip()
-            if target in {"python", "javascript"}:
+            if target in CODE_TARGETS or target == "mermaid":
                 rendered = self._strip_markdown_fence(rendered)
 
-        warnings = list(final_logic.assumptions)
-        warnings.extend(inspection.ambiguities)
-        warnings.extend(critique.semantic_risks)
-        warnings.extend(review.issues)
-        warnings = list(dict.fromkeys(warnings))
+        warnings = list(dict.fromkeys(
+            list(final_logic.assumptions)
+            + inspection.ambiguities
+            + critique.semantic_risks
+            + review.issues
+        ))
 
-        trace = None
-        if include_trace:
-            trace = PipelineTrace(
-                inspection=inspection,
-                draft_logic=draft_logic,
-                critique=critique,
-                final_logic=final_logic,
-                review=review,
-            )
+        trace = PipelineTrace(
+            inspection=inspection,
+            draft_logic=draft_logic,
+            critique=critique,
+            final_logic=final_logic,
+            review=review,
+        ) if include_trace else None
 
         return TranslationResult(
             source_name=source_name,
@@ -196,14 +171,8 @@ class JsonLogicAgent:
             warnings=warnings,
             metadata={
                 "model": self.model,
-                "pipeline": "v2",
-                "stages": [
-                    "inspector",
-                    "architect",
-                    "critic",
-                    "generator",
-                    "reviewer",
-                ],
+                "pipeline": "v3",
+                "stages": ["inspector", "architect", "critic", "generator", "reviewer"],
                 "fidelity_score": review.fidelity_score,
             },
             trace=trace,
@@ -212,15 +181,10 @@ class JsonLogicAgent:
     def translate_file(
         self,
         path: str | Path,
-        target: str = "logic",
+        target: OutputTarget = "logic",
         include_trace: bool = True,
     ) -> TranslationResult:
         file_path = Path(path)
         with file_path.open("r", encoding="utf-8") as fh:
             data = json.load(fh)
-        return self.translate(
-            data,
-            target=target,
-            source_name=file_path.name,
-            include_trace=include_trace,
-        )
+        return self.translate(data, target=target, source_name=file_path.name, include_trace=include_trace)
