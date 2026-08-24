@@ -1,0 +1,40 @@
+{
+  "name": "Customer Intake Example",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {"path": "customer-intake", "httpMethod": "POST"},
+      "name": "Customer Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {"conditions": {"string": [{"value1": "={{$json.body.email}}", "operation": "isNotEmpty"}]}},
+      "name": "Has Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {"url": "https://example.invalid/customer", "method": "POST", "jsonBody": "={{$json.body}}"},
+      "name": "Create Customer API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, -100],
+      "credentials": {"httpHeaderAuth": {"id": "example", "name": "Customer API"}}
+    },
+    {
+      "parameters": {"jsCode": "return [{json: {status: 'missing-email'}}];"},
+      "name": "Missing Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 100]
+    }
+  ],
+  "connections": {
+    "Customer Webhook": {"main": [[{"node": "Has Email?", "type": "main", "index": 0}]]},
+    "Has Email?": {"main": [[{"node": "Create Customer API", "type": "main", "index": 0}], [{"node": "Missing Email", "type": "main", "index": 0}]]}
+  },
+  "settings": {}
+}
