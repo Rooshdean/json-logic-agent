@@ -3,24 +3,19 @@ from pathlib import Path
 from typing import Any
 
 from .models import ProjectScanResult, ScannedJsonFile
+from .n8n import is_n8n_workflow
 
 
-DEFAULT_IGNORES = {
-    ".git",
-    ".venv",
-    "venv",
-    "node_modules",
-    "dist",
-    "build",
-    ".next",
-    ".cache",
-}
+DEFAULT_IGNORES = {".git", ".venv", "venv", "node_modules", "dist", "build", ".next", ".cache"}
 
 
 def _guess_kind(path: Path, data: Any) -> tuple[str, str]:
     name = path.name.lower()
     keys = set(data.keys()) if isinstance(data, dict) else set()
 
+    if is_n8n_workflow(data):
+        node_count = len(data.get("nodes", []))
+        return "n8n-workflow", f"n8n workflow export with {node_count} node(s); V5 deep-dive available"
     if name == "package.json":
         return "node-package-manifest", "Node.js package metadata, scripts, and dependencies"
     if "schema" in name or {"$schema", "properties"} & keys:
@@ -38,11 +33,7 @@ def _guess_kind(path: Path, data: Any) -> tuple[str, str]:
     return "data", "Primitive JSON data"
 
 
-def scan_project(
-    root: str | Path,
-    max_bytes: int = 1_000_000,
-    ignores: set[str] | None = None,
-) -> ProjectScanResult:
+def scan_project(root: str | Path, max_bytes: int = 1_000_000, ignores: set[str] | None = None) -> ProjectScanResult:
     root_path = Path(root).resolve()
     ignored = DEFAULT_IGNORES | (ignores or set())
     result = ProjectScanResult(root=str(root_path))
@@ -50,22 +41,17 @@ def scan_project(
     if root_path.is_file():
         candidates = [root_path]
     else:
-        candidates = sorted(
-            p for p in root_path.rglob("*.json")
-            if not any(part in ignored for part in p.relative_to(root_path).parts)
-        )
+        candidates = sorted(p for p in root_path.rglob("*.json") if not any(part in ignored for part in p.relative_to(root_path).parts))
 
     for path in candidates:
         try:
             size = path.stat().st_size
         except OSError:
             continue
-
         display_path = path.name if root_path.is_file() else str(path.relative_to(root_path))
         if size > max_bytes:
             result.skipped_large_files.append(display_path)
             continue
-
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
@@ -74,15 +60,6 @@ def scan_project(
 
         kind, note = _guess_kind(path, data)
         keys = list(data.keys())[:20] if isinstance(data, dict) else []
-        result.files.append(
-            ScannedJsonFile(
-                path=display_path,
-                size_bytes=size,
-                top_level_type=type(data).__name__,
-                top_level_keys=keys,
-                likely_kind=kind,
-                note=note,
-            )
-        )
+        result.files.append(ScannedJsonFile(path=display_path, size_bytes=size, top_level_type=type(data).__name__, top_level_keys=keys, likely_kind=kind, note=note))
 
     return result
