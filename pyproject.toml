@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "json-logic-agent"
-version = "0.3.0"
-description = "Developer-focused JSON reverse engineer: explain JSON as logic, Python, JavaScript, TypeScript, or Mermaid through a reviewed semantic pipeline."
+version = "0.4.0"
+description = "Interactive developer-focused JSON reverse engineer: browse JSON files and view their logic as plain language, Python, JavaScript, TypeScript, or Mermaid."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "openai>=1.0.0",
   "pydantic>=2.0.0",
   "python-dotenv>=1.0.0",
+  "questionary>=2.0.0",
 ]
 
 [project.optional-dependencies]
