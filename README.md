@@ -1,21 +1,40 @@
-# JSON Logic Agent
+# JSON Logic Agent V2
 
-JSON Logic Agent turns raw JSON into **human-readable operational logic** and can then translate that logic into **Python** or **JavaScript**.
+JSON Logic Agent V2 turns raw JSON into **human-readable operational logic** and can translate that logic into **Python** or **JavaScript** through a reviewed multi-agent pipeline.
 
-The key architecture is:
+## V2 pipeline
 
 ```text
-JSON file
-   ↓
-Semantic analysis
-   ↓
-Normalized Logic Model
-   ├──→ Plain-language logic
-   ├──→ Python
-   └──→ JavaScript
+JSON
+ ↓
+JSON Inspector
+ ↓
+Logic Architect
+ ↓
+Ambiguity Critic
+ ↓
+(optional revision)
+ ↓
+Code Generator
+ ↓
+Code Reviewer
+ ↓
+Final output + fidelity score
 ```
 
-The Logic Model is the core product. The agent does not simply pretty-print JSON or map keys directly to code; it first tries to understand what the JSON represents, then renders that interpretation into the requested target.
+The `LogicModel` is the canonical semantic representation. V2 does not directly map JSON keys to code.
+
+## Why V2 is different
+
+The stages have separate responsibilities:
+
+- **Inspector** discovers structure, likely semantics, ambiguities, and confidence.
+- **Architect** creates the draft `LogicModel`.
+- **Critic** challenges unsupported inference, missing branches, and ordering errors.
+- **Generator** produces plain logic, Python, or JavaScript from the final model.
+- **Reviewer** compares generated output against both the source JSON and final model, assigns a fidelity score, and can replace the output if revision is required.
+
+See [`docs/V2_ARCHITECTURE.md`](docs/V2_ARCHITECTURE.md) for the full contract.
 
 ## What it can understand
 
@@ -37,6 +56,7 @@ If the input is data-only and does not contain executable logic, the agent shoul
 ```bash
 git clone https://github.com/Rooshdean/json-logic-agent.git
 cd json-logic-agent
+chmod +x scripts/*.sh
 ./scripts/setup.sh
 ```
 
@@ -57,9 +77,23 @@ jsonlogic examples/order_workflow.json --to python
 jsonlogic examples/order_workflow.json --to javascript
 ```
 
+## Inspect the whole V2 reasoning pipeline
+
+```bash
+jsonlogic examples/order_workflow.json --to logic --show-trace
+```
+
+Save the trace for debugging or regression analysis:
+
+```bash
+jsonlogic examples/order_workflow.json --to python --trace-out trace.json
+```
+
+Each normal run also prints the reviewer fidelity score.
+
 ## Claude Code
 
-This repo contains a root `CLAUDE.md` so Claude Code immediately understands the architecture and development rules.
+The root `CLAUDE.md` describes the V2 stage contracts and development rules.
 
 ```bash
 git clone https://github.com/Rooshdean/json-logic-agent.git
@@ -71,10 +105,8 @@ claude
 Recommended first prompt:
 
 ```text
-Read CLAUDE.md, AGENTS.md, and README.md. Run the tests, explain the current JSON -> LogicModel -> renderer architecture, then help me continue developing the agent without bypassing the LogicModel.
+Read CLAUDE.md, AGENTS.md, README.md, and docs/V2_ARCHITECTURE.md. Run the tests. Explain the Inspector -> Architect -> Critic -> Generator -> Reviewer pipeline, then continue development without bypassing LogicModel.
 ```
-
-A Claude project command also lives at `.claude/commands/translate-json.md`.
 
 ## Codex
 
@@ -90,7 +122,7 @@ codex
 Recommended first prompt:
 
 ```text
-Read AGENTS.md and README.md. Run the tests, inspect the JSON -> LogicModel -> renderer pipeline, and continue development while preserving the intermediate semantic model.
+Read AGENTS.md and docs/V2_ARCHITECTURE.md. Run the tests and inspect the V2 pipeline. Preserve the typed stage contracts and keep LogicModel as the canonical semantic boundary.
 ```
 
 ## CLI usage
@@ -119,40 +151,44 @@ jsonlogic workflow.json --to javascript
 jsonlogic workflow.json --to python --out generated.py
 ```
 
-### Inspect the intermediate model
+### Show only the final LogicModel
 
 ```bash
 jsonlogic workflow.json --to logic --show-model
 ```
 
-## Why there is an intermediate Logic Model
+### Show all V2 stage artifacts
 
-Direct JSON-to-code generation can produce convincing code that subtly changes the meaning of the source. JSON Logic Agent therefore uses two passes.
+```bash
+jsonlogic workflow.json --to logic --show-trace
+```
 
-### Pass 1 — Understand
+## Programmatic usage
 
-The agent extracts:
+```python
+from json_logic_agent import JsonLogicAgent
 
-- summary
-- JSON classification
-- inputs
-- outputs
-- entities
-- conditions
-- actions
-- dependencies
-- ordered steps
-- assumptions
+agent = JsonLogicAgent()
+result = agent.translate_file("workflow.json", target="python")
 
-### Pass 2 — Render
+print(result.rendered_output)
+print(result.logic)
+print(result.metadata["fidelity_score"])
+print(result.trace)
+```
 
-That same `LogicModel` is rendered into plain logic, Python, or JavaScript.
+You can also call individual stages directly:
 
-This also makes it easy to add TypeScript, Go, Mermaid, Terraform, SQL, pseudocode, or other targets later.
+```python
+inspection = agent.inspect(data)
+draft = agent.architect(data, inspection)
+critique = agent.critique(data, inspection, draft)
+final_logic = agent.revise(data, draft, critique)
+code = agent.render(data, final_logic, "python")
+review = agent.review(data, final_logic, "python", code)
+```
 
-## Example
-
-Input:
+## Example input
 
 ```json
 {
@@ -174,25 +210,23 @@ Input:
 }
 ```
 
-Possible plain-language interpretation:
+The agent should infer logic equivalent to:
 
 ```text
-When a new order is created, inspect its total value.
-If the order total is greater than 10,000, request manager approval.
-If no rule redirects the order, auto-approve it.
+When an order is created, inspect its total.
+If the total is greater than 10,000, request manager approval.
+Otherwise, use the configured default action and auto-approve the order.
 ```
 
-Possible Python representation:
+A Python rendering may resemble:
 
 ```python
 def process_order(order):
     if order["total"] > 10_000:
-        return request_manager_approval(order)
+        return request_manager_approval(order)  # TODO: implementation is external
 
-    return auto_approve(order)
+    return auto_approve(order)  # TODO: implementation is external
 ```
-
-If the JSON names an external action but does not define its implementation, generated code should use a TODO or placeholder rather than inventing infrastructure or side effects.
 
 ## Repository structure
 
@@ -205,13 +239,11 @@ json-logic-agent/
 ├── pyproject.toml
 ├── .env.example
 ├── .claude/
-│   └── commands/
-│       └── translate-json.md
+├── .github/workflows/
+├── docs/
+│   └── V2_ARCHITECTURE.md
 ├── examples/
-│   └── order_workflow.json
 ├── scripts/
-│   ├── setup.sh
-│   └── run.sh
 ├── src/json_logic_agent/
 │   ├── __init__.py
 │   ├── agent.py
@@ -219,7 +251,6 @@ json-logic-agent/
 │   ├── models.py
 │   └── prompts.py
 └── tests/
-    └── test_models.py
 ```
 
 ## Development helpers
@@ -232,56 +263,28 @@ make python
 make javascript
 ```
 
-## Programmatic usage
-
-```python
-from json_logic_agent import JsonLogicAgent
-
-agent = JsonLogicAgent()
-result = agent.translate_file("workflow.json", target="python")
-
-print(result.rendered_output)
-print(result.logic)
-print(result.warnings)
-```
-
-## Agent rules
+## V2 fidelity rules
 
 1. Do not simply describe JSON keys.
 2. Infer execution semantics only when the source supports them.
-3. Separate facts from assumptions.
-4. Never silently invent missing business rules.
-5. Preserve conditions and ordering.
-6. Mark unresolved external operations with TODOs in generated code.
-7. Say explicitly when JSON is data rather than logic.
-8. Keep the pipeline `JSON -> LogicModel -> renderer` intact.
+3. Candidate semantics from the Inspector are not automatically facts.
+4. Separate facts from assumptions.
+5. Never silently invent missing business rules.
+6. Preserve conditions, defaults, branches, and ordering.
+7. Mark unresolved external operations with TODOs/placeholders.
+8. Say explicitly when JSON is data rather than logic.
+9. Generated code must never be auto-executed.
+10. Keep the complete pipeline inspectable.
 
-## Recommended roadmap
+## Current roadmap
 
-The next major evolution is a multi-agent pipeline:
+High-value V3 candidates:
 
-```text
-JSON Inspector
-      ↓
-Logic Architect
-      ↓
-Ambiguity Critic
-      ↓
-Code Generator
-      ↓
-Code Reviewer
-```
-
-High-value additions after that:
-
-- Anthropic/provider abstraction
-- recursive folder mode
+- provider abstraction for OpenAI / Anthropic / local models
+- recursive folder and batch mode
 - TypeScript output
-- Mermaid workflow diagrams
-- pseudocode output
-- semantic reviewer pass
-- interactive clarification mode
-- REST API
+- Mermaid diagrams
+- semantic regression fixtures
+- interactive ambiguity clarification
 - MCP server mode
-- VS Code extension
-- GitHub Action for changed JSON files
+- optional bounded reviewer revision loop
