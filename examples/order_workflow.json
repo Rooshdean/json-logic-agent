@@ -1,0 +1,27 @@
+{
+  "workflow": "order-approval",
+  "trigger": "order.created",
+  "rules": [
+    {
+      "if": {
+        "field": "order.total",
+        "operator": ">",
+        "value": 10000
+      },
+      "then": {
+        "action": "request_manager_approval"
+      }
+    },
+    {
+      "if": {
+        "field": "customer.risk_score",
+        "operator": ">=",
+        "value": 80
+      },
+      "then": {
+        "action": "hold_order"
+      }
+    }
+  ],
+  "default_action": "auto_approve"
+}
