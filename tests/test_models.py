@@ -1,4 +1,12 @@
-from json_logic_agent.models import LogicModel, LogicStep, TranslationResult
+from json_logic_agent.models import (
+    CritiqueReport,
+    InspectionReport,
+    LogicModel,
+    LogicStep,
+    PipelineTrace,
+    ReviewReport,
+    TranslationResult,
+)
 
 
 def test_logic_model_constructs():
@@ -27,3 +35,31 @@ def test_translation_result_targets():
         rendered_output="pass",
     )
     assert result.target == "python"
+
+
+def test_v2_pipeline_trace_constructs():
+    inspection = InspectionReport(
+        json_kind="workflow",
+        structural_summary="A simple workflow",
+        confidence=0.9,
+    )
+    draft = LogicModel(summary="Draft", json_kind="workflow")
+    critique = CritiqueReport(verdict="accept")
+    final = LogicModel(summary="Final", json_kind="workflow")
+    review = ReviewReport(verdict="pass", fidelity_score=97)
+
+    trace = PipelineTrace(
+        inspection=inspection,
+        draft_logic=draft,
+        critique=critique,
+        final_logic=final,
+        review=review,
+    )
+
+    assert trace.review is not None
+    assert trace.review.fidelity_score == 97
+
+
+def test_review_score_bounds():
+    review = ReviewReport(verdict="pass", fidelity_score=100)
+    assert review.fidelity_score == 100
