@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "json-logic-agent"
-version = "0.4.0"
-description = "Interactive developer-focused JSON reverse engineer: browse JSON files and view their logic as plain language, Python, JavaScript, TypeScript, or Mermaid."
+version = "0.5.0"
+description = "Interactive JSON and n8n workflow reverse engineer with normal logic, Python, JavaScript, TypeScript, Mermaid, graph analysis, and semantic review."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
