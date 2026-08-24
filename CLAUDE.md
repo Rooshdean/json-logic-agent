@@ -2,111 +2,88 @@
 
 ## Project
 
-You are working on **JSON Logic Agent V2**: a multi-stage agent that reads arbitrary JSON, explains its operational meaning in normal language, and optionally converts that meaning into Python or JavaScript.
+You are working on **JSON Logic Agent V3**: a developer-focused JSON reverse engineer for people who understand programming but do not necessarily want to read or mentally parse complex JSON.
 
-## Non-negotiable architecture
+A user should be able to say: "show me what this JSON does as normal logic, Python, JavaScript, TypeScript, or a diagram."
 
-Preserve this pipeline:
+## Non-negotiable fidelity architecture
 
-`JSON -> Inspector -> Logic Architect -> Ambiguity Critic -> Code Generator -> Code Reviewer -> output`
+Preserve:
 
-The `LogicModel` remains the canonical semantic intermediate representation. Never implement JSON-to-code as a direct shortcut.
+`JSON -> Inspector -> Logic Architect -> Ambiguity Critic -> LogicModel -> Generator -> Code Reviewer -> output`
+
+`LogicModel` is canonical. Never implement a direct JSON-to-code shortcut.
+
+## V3 developer experience
+
+Primary commands:
+
+```bash
+jsonlogic scan .
+jsonlogic explain file.json
+jsonlogic explain file.json --to python
+jsonlogic explain file.json --to javascript
+jsonlogic explain file.json --to typescript
+jsonlogic explain file.json --to mermaid
+```
+
+The old `jsonlogic file.json --to ...` syntax should remain compatible.
+
+Project scanning must remain local/deterministic by default. Do not send every discovered project file to a model merely to list/classify files.
 
 ## Stage ownership
 
-### JSON Inspector
-- classifies the JSON;
-- identifies structural signals and candidate semantics;
-- records ambiguities and confidence;
-- does not decide final business logic.
+- Inspector: structure, candidates, ambiguity, confidence.
+- Architect: evidence-backed canonical LogicModel.
+- Critic: challenge assumptions, missing branches, and ordering.
+- Generator: render only from final LogicModel, using source for fidelity context.
+- Reviewer: compare output with source + LogicModel and correct semantic drift.
 
-### Logic Architect
-- creates the draft `LogicModel`;
-- derives execution order, conditions, actions, inputs, outputs, entities, and dependencies;
-- may use inspector observations only when supported by the original source.
+## Supported targets
 
-### Ambiguity Critic
-- challenges the draft against the original JSON;
-- detects unsupported inference, missing logic, ordering problems, and semantic risks;
-- returns `accept` or `revise`.
+`logic`, `python`, `javascript`, `typescript`, `mermaid`.
 
-### Code Generator
-- renders only from the final `LogicModel` plus original JSON for fidelity checking;
-- supports `logic`, `python`, and `javascript`;
-- uses TODOs for unresolved external behavior.
-
-### Code Reviewer
-- compares generated output with BOTH the original JSON and final `LogicModel`;
-- scores fidelity from 0 to 100;
-- may return a corrected complete output when revision is needed.
+New targets must consume the final LogicModel.
 
 ## Behavior
 
-When interpreting JSON:
-
-- classify before assuming executable behavior;
-- distinguish source facts from assumptions;
-- never invent missing business rules;
-- explicitly identify data-only JSON;
-- preserve conditions, defaults, branches, and execution ordering;
-- use TODOs/placeholders for external operations whose implementation is absent;
-- never automatically execute generated code.
+- Optimize explanations for developers who understand code but may dislike JSON.
+- Explain purpose and flow, not just keys.
+- Never invent missing business rules.
+- Preserve conditions, defaults, branches, and order.
+- Mark unresolved external behavior with TODOs/placeholders.
+- Identify data-only JSON honestly.
+- Never auto-execute generated code.
 
 ## Development workflow
 
-Before editing:
+Before and after edits:
 
 ```bash
 pytest -q
 ```
 
-After editing:
+Useful debugging:
 
 ```bash
-pytest -q
+jsonlogic scan .
+jsonlogic explain examples/order_workflow.json --show-trace
 ```
 
-Useful commands:
+## Important files
 
-```bash
-make test
-make logic
-make python
-make javascript
-```
+- `src/json_logic_agent/agent.py` — five-stage orchestration.
+- `src/json_logic_agent/models.py` — canonical semantic/stage models.
+- `src/json_logic_agent/prompts.py` — role prompts and render targets.
+- `src/json_logic_agent/scanner.py` — local project discovery/classification.
+- `src/json_logic_agent/cli.py` — V3 developer UX.
+- `docs/V2_ARCHITECTURE.md` — fidelity-stage contract inherited by V3.
 
-Debug the entire reasoning pipeline with:
+## V3.x priorities
 
-```bash
-jsonlogic examples/order_workflow.json --to logic --show-trace
-```
-
-Or save it:
-
-```bash
-jsonlogic examples/order_workflow.json --to python --trace-out trace.json
-```
-
-## Key source files
-
-- `src/json_logic_agent/models.py`: typed V2 pipeline artifacts and canonical `LogicModel`.
-- `src/json_logic_agent/prompts.py`: role-specific prompts for all five stages.
-- `src/json_logic_agent/agent.py`: V2 pipeline orchestration.
-- `src/json_logic_agent/cli.py`: command-line interface and trace inspection.
-- `docs/V2_ARCHITECTURE.md`: architecture contract.
-
-## Coding style
-
-Keep implementation small and explicit. Prefer typed models and testable stage methods. Avoid adding agent frameworks unless they solve a concrete requirement. Provider abstractions should not weaken the V2 stage boundaries.
-
-## Roadmap priority
-
-When asked to improve the project without a more specific requirement, prioritize:
-
-1. provider abstraction (OpenAI/Anthropic/local);
-2. directory/batch mode;
-3. TypeScript and Mermaid renderers;
-4. semantic regression fixtures;
-5. MCP server mode;
-6. interactive ambiguity clarification;
-7. optional iterative reviewer loop with a strict max revision count.
+1. interactive terminal picker after project scan;
+2. multi-file/system explanation with explicit user selection;
+3. dependency graph across related JSON files;
+4. provider abstraction;
+5. confidence-based clarification;
+6. MCP server mode.
