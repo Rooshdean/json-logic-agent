@@ -28,16 +28,17 @@ def test_mutable_defaults_are_isolated():
 
 def test_translation_result_targets():
     logic = LogicModel(summary="Test", json_kind="workflow")
-    result = TranslationResult(
-        source_name="test.json",
-        target="python",
-        logic=logic,
-        rendered_output="pass",
-    )
-    assert result.target == "python"
+    for target in ["logic", "python", "javascript", "typescript", "mermaid"]:
+        result = TranslationResult(
+            source_name="test.json",
+            target=target,
+            logic=logic,
+            rendered_output="pass",
+        )
+        assert result.target == target
 
 
-def test_v2_pipeline_trace_constructs():
+def test_pipeline_trace_constructs():
     inspection = InspectionReport(
         json_kind="workflow",
         structural_summary="A simple workflow",
