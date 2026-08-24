@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "json-logic-agent"
-version = "0.2.0"
-description = "Multi-stage agent pipeline that translates JSON into human-readable logic, Python, or JavaScript through a reviewed semantic model."
+version = "0.3.0"
+description = "Developer-focused JSON reverse engineer: explain JSON as logic, Python, JavaScript, TypeScript, or Mermaid through a reviewed semantic pipeline."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
