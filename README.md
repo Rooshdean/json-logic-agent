@@ -1,8 +1,8 @@
-# JSON Logic Agent V5
+# JSON Logic Agent V5.1
 
 > **Understand JSON — and deep-dive n8n workflows — without having to think in JSON.**
 
-JSON Logic Agent is for developers who understand code but do not want to mentally parse large JSON files. V5 adds first-class **n8n Workflow Intelligence** on top of the interactive V4 experience.
+JSON Logic Agent is an interactive JSON/n8n reverse-engineering tool. V5.1 uses **OpenRouter** for standalone AI-assisted analysis, so you can choose from OpenRouter-supported model IDs instead of being tied to one model provider.
 
 ## Start here
 
@@ -10,68 +10,73 @@ JSON Logic Agent is for developers who understand code but do not want to mental
 jsonlogic scan .
 ```
 
-Use arrow keys to select a JSON file and choose **Normal logic / Python / JavaScript / TypeScript / Mermaid**. Exported n8n workflows are detected automatically and shown as `[n8n-workflow]`.
+Use arrow keys to choose a JSON file and view it as normal logic, Python, JavaScript, TypeScript, or Mermaid. n8n workflow exports are detected automatically.
+
+## Installation
+
+Python **3.10+** is required. On macOS, if the system Python is 3.9, install a newer Python first, for example with Homebrew:
+
+```bash
+brew install python@3.12
+```
+
+Then:
+
+```bash
+git clone https://github.com/Rooshdean/json-logic-agent.git
+cd json-logic-agent
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -e .
+cp .env.example .env
+```
+
+## Configure OpenRouter
+
+Create an API key in OpenRouter and put it in `.env`:
+
+```text
+OPENROUTER_API_KEY=your-openrouter-key
+JSON_LOGIC_MODEL=anthropic/claude-sonnet-4
+```
+
+`JSON_LOGIC_MODEL` can be changed to another model ID available through OpenRouter. Model availability/IDs can change, so check OpenRouter's model catalog when choosing one.
+
+The OpenRouter key is required only for **AI-assisted semantic analysis**. Local scanning and deterministic n8n reports do not require it.
 
 ## n8n deep dive
 
-Export a workflow from n8n and run:
-
-```bash
-jsonlogic n8n workflow.json
-```
-
-V5 reconstructs the workflow graph before asking the semantic agents to explain it. It analyzes nodes, connections, triggers, branches, integrations, expressions, credential types, custom code, AI nodes, disconnected nodes, terminal paths, and review/risk signals.
-
-Want only the local structural report with **no model/API call**?
+Local structural analysis — no API call:
 
 ```bash
 jsonlogic n8n workflow.json --report-only
 ```
 
-Want to understand the n8n workflow as JavaScript?
+Full semantic deep dive through OpenRouter:
+
+```bash
+jsonlogic n8n workflow.json
+```
+
+Other representations:
 
 ```bash
 jsonlogic n8n workflow.json --to javascript
-```
-
-Or Python / TypeScript / diagram:
-
-```bash
 jsonlogic n8n workflow.json --to python
 jsonlogic n8n workflow.json --to typescript
 jsonlogic n8n workflow.json --to mermaid
 ```
 
-See the complete [n8n Workflow Guide](docs/N8N_WORKFLOWS.md).
-
----
-
-## Quick installation
+Override the configured OpenRouter model for one run:
 
 ```bash
-git clone https://github.com/Rooshdean/json-logic-agent.git
-cd json-logic-agent
-chmod +x scripts/*.sh
-./scripts/setup.sh
-source .venv/bin/activate
-cp .env.example .env
+jsonlogic n8n workflow.json --model <openrouter-model-id>
 ```
 
-Add your API key to `.env`:
+See [n8n Workflow Intelligence](docs/N8N_WORKFLOWS.md).
 
-```text
-OPENAI_API_KEY=your-api-key-here
-```
-
-Then try:
-
-```bash
-jsonlogic scan .
-jsonlogic n8n examples/n8n_customer_workflow.json --report-only
-jsonlogic n8n examples/n8n_customer_workflow.json
-```
-
-## Generic JSON still works
+## Generic JSON
 
 ```bash
 jsonlogic explain file.json
@@ -81,69 +86,48 @@ jsonlogic explain file.json --to typescript
 jsonlogic explain file.json --to mermaid
 ```
 
-If `file.json` is an n8n export, `explain` activates n8n intelligence automatically. To print the n8n structural report too:
+If the file is an n8n export, V5.1 automatically activates n8n-aware analysis.
 
-```bash
-jsonlogic explain workflow.json --n8n-report
-```
-
-## What V5 adds for n8n
-
-| Capability | V5 behavior |
-| --- | --- |
-| n8n detection | Recognizes exported workflows from nodes/connections and n8n node types |
-| Node graph | Reconstructs source → target connections and branch output indexes |
-| Triggers | Identifies likely webhook/trigger entry points |
-| Decisions | Identifies IF/Switch/filter-style nodes |
-| Integrations | Inventories external/service node types and HTTP/API nodes |
-| Expressions | Counts and surfaces n8n `{{...}}` expressions for semantic review |
-| Custom code | Identifies Code/Function nodes for deeper manual review |
-| AI nodes | Identifies common AI/agent/model node families |
-| Credentials | Inventories credential **types/references**, never secret values |
-| Graph health | Finds disconnected and terminal nodes |
-| Risk signals | Flags missing obvious triggers, disconnected nodes, custom code, and external nodes without explicit node-level retry/error settings |
-
-Risk findings are review signals, not proof that a workflow is broken; n8n behavior can also be configured outside an individual node/export.
-
-## V5 architecture
-
-Generic JSON:
+## Local vs OpenRouter
 
 ```text
-JSON → Inspector → Architect → Critic → LogicModel → Generator → Reviewer
+JSON Logic Agent
+      │
+      ├── LOCAL
+      │    ├── jsonlogic scan .
+      │    └── jsonlogic n8n workflow.json --report-only
+      │
+      └── OPENROUTER
+           ├── Inspector
+           ├── Logic Architect
+           ├── Ambiguity Critic
+           ├── Generator
+           └── Reviewer
 ```
 
-n8n export:
+The deterministic n8n analyzer runs before OpenRouter and provides grounded graph evidence: nodes, connections, branch indexes, triggers, decisions, integrations, expressions, credential types, Code/AI nodes, disconnected nodes, terminal paths, and conservative review signals.
+
+## n8n architecture
 
 ```text
 n8n JSON
    ↓
 Format detection
    ↓
-Deterministic n8n analyzer
-   ├─ node inventory
-   ├─ connection graph
-   ├─ branch outputs
-   ├─ integrations
-   ├─ expressions
-   └─ review signals
+Local deterministic n8n analyzer
    ↓
-Inspector
+Structured workflow context
    ↓
-Logic Architect
+OpenRouter model
    ↓
-Ambiguity Critic
+Inspector → Architect → Critic → LogicModel
    ↓
-LogicModel
-   ↓
-Generator
-   ↓
-Reviewer
+Generator → Reviewer
    ↓
 Logic / Python / JavaScript / TypeScript / Mermaid
 ```
 
-The deterministic n8n report gives the semantic agents grounded graph evidence before they interpret the business logic.
+Credential secret values must never be exposed. Generated code is conceptual and is never automatically executed.
 
 ## Interactive mode
 
@@ -151,37 +135,24 @@ The deterministic n8n report gives the semantic agents grounded graph evidence b
 jsonlogic scan .
 ```
 
-An n8n file appears like:
-
-```text
-❯ customer-onboarding.json  [n8n-workflow]
-```
-
-Selecting it presents n8n deep-dive views. Non-interactive behavior remains available:
+n8n files appear as `[n8n-workflow]`. For scripts/CI:
 
 ```bash
 jsonlogic scan . --no-interactive
 jsonlogic scan . --json
 ```
 
-Scanning is local. It does not upload every discovered file.
+Scanning remains local and does not upload every discovered file.
 
-## Fidelity
+## Claude Code / Codex
 
-V5 still uses `LogicModel` as the canonical semantic boundary and reports a reviewer fidelity score. For complex workflows:
-
-```bash
-jsonlogic n8n workflow.json --show-trace
-```
-
-Generated Python/JavaScript/TypeScript represents the **conceptual workflow logic**. It is not a drop-in replacement for the n8n runtime and is never automatically executed.
+You can still launch `claude` or `codex` from this repository to develop or inspect the project. The standalone `jsonlogic explain` / `jsonlogic n8n` semantic commands use the OpenRouter configuration above; `--report-only` remains local.
 
 ## Documentation
 
 - [Getting Started](docs/GETTING_STARTED.md)
 - [n8n Workflow Intelligence](docs/N8N_WORKFLOWS.md)
 - [Command Reference](docs/COMMANDS.md)
-- [V2 Fidelity Architecture](docs/V2_ARCHITECTURE.md)
 - [CLAUDE.md](CLAUDE.md)
 - [AGENTS.md](AGENTS.md)
 
@@ -191,8 +162,6 @@ Generated Python/JavaScript/TypeScript represents the **conceptual workflow logi
 pytest -q
 ```
 
-Current package version: **0.5.0**.
-
-## Core rule
+Current package version: **0.5.1**.
 
 > **Understand first. Translate second. For n8n, reconstruct the workflow before explaining it.**
