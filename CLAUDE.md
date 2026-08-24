@@ -2,66 +2,63 @@
 
 ## Project
 
-You are working on **JSON Logic Agent V4**: an interactive developer-focused JSON reverse engineer for people who understand programming but do not want to mentally parse complex JSON.
+You are working on **JSON Logic Agent V5**: an interactive JSON reverse engineer with first-class n8n Workflow Intelligence.
 
-## Primary V4 experience
+## Product promise
 
-The default human workflow is:
+A developer should be able to export an n8n workflow JSON and ask: what does this automation actually do, what calls what, where does data branch, what integrations/credentials types does it depend on, what deserves review, and what would the conceptual logic look like in Python/JavaScript/TypeScript or a diagram?
 
-```text
-jsonlogic scan .
-      ↓
-arrow-key file picker
-      ↓
-Explain / Python / JavaScript / TypeScript / Mermaid
-      ↓
-result
-      ↓
-another view / another file / exit
-```
-
-Interactive mode must only auto-start when stdin and stdout are TTYs. Scripts, CI, pipes, and `--no-interactive` must retain deterministic list output. `--json` must always remain machine-readable and non-interactive.
-
-Project scanning remains local. Do not send all discovered files to a model merely to populate the picker.
-
-## Non-negotiable semantic architecture
+## n8n architecture
 
 Preserve:
 
-`JSON -> Inspector -> Logic Architect -> Ambiguity Critic -> LogicModel -> Generator -> Reviewer -> output`
+`n8n JSON -> deterministic detection/analyzer -> Inspector -> Architect -> Critic -> LogicModel -> Generator -> Reviewer`
 
-`LogicModel` is canonical. Never implement direct JSON-to-code conversion.
+The deterministic analyzer lives in `src/json_logic_agent/n8n.py`. It must remain usable without an LLM via `jsonlogic n8n file.json --report-only`.
 
-## Supported targets
+It should derive graph facts locally: nodes, connections, output indexes, triggers, decisions, integrations, expressions, credential types, code/AI nodes, disconnected/terminal nodes, and conservative review signals.
 
-`logic`, `python`, `javascript`, `typescript`, `mermaid`.
+Never expose credential secret values. Never claim a risk signal proves a workflow is broken.
 
-## Important files
+## Generic JSON
 
-- `src/json_logic_agent/interactive.py` — V4 terminal menus and action mapping.
-- `src/json_logic_agent/cli.py` — TTY detection and CLI orchestration.
-- `src/json_logic_agent/scanner.py` — local deterministic JSON discovery.
-- `src/json_logic_agent/agent.py` — semantic pipeline.
-- `src/json_logic_agent/models.py` — typed contracts and LogicModel.
-- `src/json_logic_agent/prompts.py` — semantic/render prompts.
+Generic JSON continues through `Inspector -> Architect -> Critic -> LogicModel -> Generator -> Reviewer`. Do not weaken this path while adding n8n features.
+
+## Interactive UX
+
+`jsonlogic scan .` is interactive only on TTY stdin/stdout. n8n files are labeled `[n8n-workflow]` and get n8n deep-dive wording. `--no-interactive` and `--json` remain deterministic/local.
+
+## Commands
+
+```bash
+jsonlogic scan .
+jsonlogic explain file.json
+jsonlogic n8n workflow.json
+jsonlogic n8n workflow.json --report-only
+jsonlogic n8n workflow.json --to javascript
+jsonlogic n8n workflow.json --to mermaid
+```
 
 ## Development rules
 
 - Python 3.10+.
-- Run `pytest -q` before and after edits.
-- Keep the interactive layer thin; it should select a file and target, then call the existing semantic pipeline.
-- Do not duplicate semantic logic inside the UI.
-- Preserve direct `jsonlogic explain ...` commands and legacy syntax.
-- Never auto-execute generated code.
-- Never invent missing business rules.
-- New output views must consume final LogicModel.
+- Run `pytest -q` before/after edits.
+- Keep deterministic parsing separate from AI semantic interpretation.
+- Preserve branch output indexes in n8n graph analysis.
+- Treat Code nodes and expressions as important semantic evidence.
+- Generated code is conceptual and never auto-executed.
+- New render targets consume final LogicModel.
+- Add fixtures/tests for new n8n node families or topology behavior.
 
-## V4.x priorities
+## Important files
 
-1. search/filter inside the interactive file picker;
-2. optional preview panel with file classification/keys before selection;
-3. explicit multi-select for related JSON files and system-level explanation;
-4. dependency graph across selected files;
-5. provider abstraction;
-6. confidence-based clarification;
-7. MCP mode.
+- `src/json_logic_agent/n8n.py` — V5 deterministic n8n intelligence.
+- `src/json_logic_agent/agent.py` — n8n context injection + semantic pipeline.
+- `src/json_logic_agent/scanner.py` — n8n detection during project discovery.
+- `src/json_logic_agent/interactive.py` — V5 picker.
+- `src/json_logic_agent/cli.py` — `n8n`, `scan`, `explain` commands.
+- `docs/N8N_WORKFLOWS.md` — user-facing n8n contract.
+
+## Next priorities
+
+Improve node-type taxonomy, expression/data lineage analysis, branch labels, error-workflow semantics, sub-workflow resolution, AI-agent/tool topology, and cross-workflow dependency graphs while remaining conservative about unsupported behavior.
