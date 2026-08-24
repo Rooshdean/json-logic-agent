@@ -65,6 +65,48 @@ class PipelineTrace(BaseModel):
     review: ReviewReport | None = None
 
 
+class N8nNodeSummary(BaseModel):
+    name: str
+    node_type: str
+    category: str
+    disabled: bool = False
+    credential_types: list[str] = Field(default_factory=list)
+    expression_count: int = 0
+    has_error_policy: bool = False
+
+
+class N8nConnectionSummary(BaseModel):
+    source: str
+    target: str
+    output_index: int = 0
+    connection_type: str = "main"
+
+
+class N8nRiskFinding(BaseModel):
+    severity: Literal["low", "medium", "high"]
+    node: str | None = None
+    finding: str
+
+
+class N8nWorkflowReport(BaseModel):
+    is_n8n: bool = True
+    workflow_name: str | None = None
+    active: bool | None = None
+    node_count: int = 0
+    connection_count: int = 0
+    trigger_nodes: list[str] = Field(default_factory=list)
+    decision_nodes: list[str] = Field(default_factory=list)
+    code_nodes: list[str] = Field(default_factory=list)
+    ai_nodes: list[str] = Field(default_factory=list)
+    integrations: list[str] = Field(default_factory=list)
+    credential_types: list[str] = Field(default_factory=list)
+    nodes: list[N8nNodeSummary] = Field(default_factory=list)
+    connections: list[N8nConnectionSummary] = Field(default_factory=list)
+    disconnected_nodes: list[str] = Field(default_factory=list)
+    terminal_nodes: list[str] = Field(default_factory=list)
+    risks: list[N8nRiskFinding] = Field(default_factory=list)
+
+
 class TranslationResult(BaseModel):
     source_name: str
     target: OutputTarget
@@ -73,6 +115,7 @@ class TranslationResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     trace: PipelineTrace | None = None
+    n8n_report: N8nWorkflowReport | None = None
 
 
 class ScannedJsonFile(BaseModel):
