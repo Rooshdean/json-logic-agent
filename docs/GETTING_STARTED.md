@@ -1,12 +1,10 @@
-# Getting Started with JSON Logic Agent V4
+# Getting Started with JSON Logic Agent V5
 
-JSON Logic Agent is for developers who can understand code but find large or unfamiliar JSON difficult to reason about.
-
-V4 makes the normal workflow interactive: **scan → choose a file → choose how you want to see it**.
+JSON Logic Agent helps developers understand unfamiliar JSON and exported n8n workflows as normal logic or familiar code.
 
 ## 1. Install
 
-You need Python 3.10+, Git, and an OpenAI API key.
+Requirements: Python 3.10+, Git, and an OpenAI API key for semantic deep dives.
 
 ```bash
 git clone https://github.com/Rooshdean/json-logic-agent.git
@@ -14,218 +12,121 @@ cd json-logic-agent
 chmod +x scripts/*.sh
 ./scripts/setup.sh
 source .venv/bin/activate
-```
-
-## 2. Configure the API key
-
-```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
+Add to `.env`:
 
 ```text
 OPENAI_API_KEY=your-api-key-here
 ```
 
-Never commit your real API key.
-
-## 3. Start V4
-
-Move into a project containing JSON and run:
+## 2. Easiest workflow
 
 ```bash
 jsonlogic scan .
 ```
 
-Use **↑ / ↓** to select a file and press **Enter**.
+Use arrow keys to choose a file, then choose Normal logic, Python, JavaScript, TypeScript, or Mermaid. n8n exports are detected automatically.
 
-You will then see:
-
-```text
-Explain in normal logic
-Show as Python
-Show as JavaScript
-Show as TypeScript
-Draw as Mermaid diagram
-Choose another file
-Exit
-```
-
-Choose the representation that makes the JSON easiest for you to understand.
-
-After the result, V4 lets you:
-
-- view the same file another way
-- choose another JSON file
-- exit
-
-## 4. Example workflow
-
-Suppose a project contains:
-
-```text
-my-project/
-├── package.json
-├── config.json
-├── permissions.json
-└── workflows/
-    └── approval.json
-```
-
-Run:
+## 3. Deep-dive an n8n export
 
 ```bash
-cd my-project
-jsonlogic scan .
+jsonlogic n8n workflow.json
 ```
 
-Select `workflows/approval.json`, then choose **Show as JavaScript**.
+Before semantic interpretation, V5 locally reconstructs the n8n workflow graph and inventories triggers, decisions, integrations, expressions, credentials types, code/AI nodes, disconnected nodes, terminal nodes, and review signals.
 
-If JavaScript still does not make the flow obvious, choose **Use another view for this file** and then **Draw as Mermaid diagram**.
-
-You do not need to remember the individual `--to` commands when using interactive mode.
-
-## 5. Direct commands are still available
+Try the included fixture:
 
 ```bash
-jsonlogic explain approval.json
-jsonlogic explain approval.json --to python
-jsonlogic explain approval.json --to javascript
-jsonlogic explain approval.json --to typescript
-jsonlogic explain approval.json --to mermaid
+jsonlogic n8n examples/n8n_customer_workflow.json --report-only
 ```
 
-These are useful for scripts, repeatable workflows, or when you already know exactly what you want.
+This command is local and makes no model/API call.
 
-## 6. Non-interactive scanning
+Then run the full deep dive:
 
-If you only want the discovered file list:
+```bash
+jsonlogic n8n examples/n8n_customer_workflow.json
+```
+
+Or choose a developer representation:
+
+```bash
+jsonlogic n8n examples/n8n_customer_workflow.json --to javascript
+jsonlogic n8n examples/n8n_customer_workflow.json --to python
+jsonlogic n8n examples/n8n_customer_workflow.json --to typescript
+jsonlogic n8n examples/n8n_customer_workflow.json --to mermaid
+```
+
+Read [n8n Workflow Intelligence](N8N_WORKFLOWS.md) for the full guide.
+
+## 4. Generic JSON
+
+```bash
+jsonlogic explain config.json
+jsonlogic explain config.json --to javascript
+```
+
+If the file is actually an n8n export, V5 detects it and activates the n8n-aware pipeline automatically.
+
+## 5. Local vs AI-assisted operations
+
+Local/no model call:
 
 ```bash
 jsonlogic scan . --no-interactive
-```
-
-For JSON output:
-
-```bash
 jsonlogic scan . --json
+jsonlogic n8n workflow.json --report-only
 ```
 
-When stdin/stdout are not attached to a real terminal — for example in CI or a shell pipe — `scan` automatically uses non-interactive output.
-
-## 7. Save generated output
+AI-assisted semantic interpretation:
 
 ```bash
-jsonlogic explain approval.json --to python --out approval.py
-jsonlogic explain approval.json --to mermaid --out approval.mmd
+jsonlogic explain file.json
+jsonlogic n8n workflow.json
 ```
 
-Generated code is an aid for understanding semantics. JSON Logic Agent never automatically executes it.
+This separation is intentional: discovering or structurally inspecting files should not require sending every file to a model.
 
-## 8. Fidelity and uncertainty
-
-The semantic pipeline is:
-
-```text
-JSON
- ↓
-Inspector
- ↓
-Logic Architect
- ↓
-Ambiguity Critic
- ↓
-LogicModel
- ↓
-Generator
- ↓
-Reviewer
- ↓
-Final output + fidelity score
-```
-
-The reviewer reports a fidelity score estimating how closely the generated representation preserves the meaning supported by the JSON.
-
-For difficult files:
+## 6. Save output
 
 ```bash
-jsonlogic explain approval.json --show-trace
+jsonlogic n8n workflow.json --to javascript --out workflow.js
+jsonlogic explain config.json --to python --out config_logic.py
 ```
 
-Save the trace with:
+Generated code is conceptual logic and is never automatically executed.
+
+## 7. Inspect uncertainty
 
 ```bash
-jsonlogic explain approval.json --trace-out trace.json
+jsonlogic n8n workflow.json --show-trace
+jsonlogic explain file.json --show-trace
 ```
 
-The trace exposes assumptions and ambiguity instead of hiding them.
+The trace exposes the inspector, draft semantic model, critique, final LogicModel, and reviewer.
 
-## 9. What kinds of JSON can it help with?
+## 8. Troubleshooting
 
-- workflow definitions
-- automation rules
-- configuration
-- permissions/access policies
-- schemas
-- API structures
-- state machines
-- infrastructure configuration
-- ordinary data
-
-Not every JSON file represents executable logic. The agent should identify data-only JSON rather than invent behavior.
-
-## 10. Troubleshooting
-
-### `jsonlogic: command not found`
+If `jsonlogic` is missing:
 
 ```bash
 source .venv/bin/activate
 ```
 
-If needed:
-
-```bash
-./scripts/setup.sh
-```
-
-### The interactive menu does not appear
-
-Make sure you are running in a normal interactive terminal and did not pass `--no-interactive` or `--json`.
-
-Update your installation after pulling V4 so the `questionary` dependency is installed:
+After pulling a new version:
 
 ```bash
 git pull
 ./scripts/setup.sh
 ```
 
-### API authentication error
+If an n8n export is not detected, confirm it is a workflow export containing a top-level `nodes` array, `connections` object, and recognizable n8n node `type` values.
 
-Check `.env` contains a valid `OPENAI_API_KEY`.
+If you only want local n8n information and do not want an API call, always use `--report-only`.
 
-### I only want to find JSON, not send it to AI
+## 9. Claude Code / Codex
 
-Run:
-
-```bash
-jsonlogic scan . --no-interactive
-```
-
-Scanning is local. Files enter the semantic AI pipeline only when you choose to explain/render one.
-
-## 11. Developing with Claude Code or Codex
-
-Claude Code:
-
-```bash
-claude
-```
-
-Codex:
-
-```bash
-codex
-```
-
-Both have repository-specific instructions in `CLAUDE.md` and `AGENTS.md`.
+Run `claude` or `codex` in the repo. Both have V5-specific repository instructions in `CLAUDE.md` and `AGENTS.md`.
